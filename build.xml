@@ -1,0 +1,56 @@
+<?xml version="1.0"?>
+<project name="main" default="dist" basedir=".">
+  <property file="${basedir}/build.properties" />
+  <property environment="env" />
+  <property name="name" value="${project.name}" />
+  <property name="version" value="${project.version}" />
+  <property name="final.name" value="${name}-${version}" />
+  <property name="src.dir" value="${basedir}/src" />
+  <property name="build.dir" value="${basedir}/build" />
+  <property name="build.classes" value="${build.dir}/classes" />
+<!--
+  <property name="hadoop.home" value="/home/hytan-hadoop/local/opt/hadoop-0.20.2/" />
+-->
+
+  <path id="hadoop.classpath">
+    <fileset dir="${hadoop.home}/lib">
+      <include name="**/*.jar" />
+    </fileset>
+    <fileset dir="${hadoop.home}">
+      <include name="*.jar" />
+    </fileset>
+  </path>
+
+  <target name="init">
+    <mkdir dir="${build.classes}" />
+  </target>
+
+  <target name="compile" depends="init">
+    <javac srcdir="${src.dir}" destdir="${build.classes}">
+      <compilerarg value="-Xlint" />
+      <classpath refid="hadoop.classpath" />
+    </javac>
+  </target>
+
+  <target name="dist" depends="compile">
+    <jar destfile="${basedir}/${final.name}.jar" basedir="${build.classes}" />
+  </target>
+
+  <target name="clean">
+    <delete dir="${build.dir}" />
+    <delete file="${basedir}/${final.name}.jar" />
+  </target>
+
+  <target name="test" depends="compile">
+    <junit fork="yes" haltonfailure="yes">
+      <batchtest>
+        <fileset dir="${build.classes}" includes="test/**/*Test.class" />
+      </batchtest>
+      <formatter type="plain" usefile="false" />
+      <classpath refid="hadoop.classpath" />
+      <classpath>
+        <pathelement path="${build.classes}" />
+      </classpath>
+    </junit>
+  </target>
+</project>
