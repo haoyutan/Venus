@@ -30,8 +30,9 @@ public class VirtualTextRegionInputFormat extends
 			if (curRecords == totalRecords)
 				return false;
 			
-			key.set(curRecords++);
-			value.set("3,0,0,1,0,1,1");
+			key.set(-1);
+			value.set("" + curRecords + ",3,0,0,1,0,1,1");
+			++curRecords;
 			return true;
 		}
 	}

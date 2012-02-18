@@ -22,12 +22,24 @@ public abstract class ItemWritable<I extends Writable, P extends Writable, S ext
 	protected S signature;
 	private int mask = MASK_ID | MASK_PLD;
 
+	@SuppressWarnings("unchecked")
 	public ItemWritable(Class<? extends Writable> idClass,
 			Class<? extends Writable> payloadClass,
-			Class<? extends Writable> signatureClass) {
+			Class<? extends Writable> signatureClass,
+			boolean createFields) {
 		this.idClass = idClass;
 		this.payloadClass = payloadClass;
 		this.signatureClass = signatureClass;
+		
+		if (createFields) {
+			try {
+				id = (I) idClass.newInstance();
+				payload = (P) payloadClass.newInstance();
+				signature = (S) signatureClass.newInstance();
+			} catch (Exception e) {
+				throw new RuntimeException(e);
+			}
+		}
 	}
 	
 	public int getMask() {
@@ -65,9 +77,6 @@ public abstract class ItemWritable<I extends Writable, P extends Writable, S ext
 	@Override
 	public void readFields(DataInput in) throws IOException {
 		mask = in.readInt();
-		id = null;
-		payload = null;
-		signature = null;
 		if ((mask & MASK_ID) != 0)
 			id.readFields(in);
 		if ((mask & MASK_PLD) != 0)

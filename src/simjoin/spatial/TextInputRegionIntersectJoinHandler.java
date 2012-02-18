@@ -4,29 +4,28 @@ import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Text;
 
-public class TextInputRegionIntersectJoinHandler extends
+public abstract class TextInputRegionIntersectJoinHandler extends
 		RegionIntersectJoinHandler<LongWritable, Text> {
 
 	@Override
 	protected void resetItem(RegionItemWritable item, LongWritable key,
 			Text value) {
-
-		item.setId(new IntWritable((int) key.get()));
 		
 		String line = value.toString();
 		String[] fields = line.split(",");
 		
-		int numPoints = Integer.parseInt(fields[0]);
+		item.setId(new IntWritable(Integer.parseInt(fields[0])));
+		int numPoints = Integer.parseInt(fields[1]);
 		double x[] = new double[numPoints];
 		double y[] = new double[numPoints];
-		double xMin = Double.MAX_VALUE;
-		double xMax = Double.MIN_VALUE;
-		double yMin = Double.MAX_VALUE;
-		double yMax = Double.MIN_VALUE;
+		double xMin = Double.POSITIVE_INFINITY;
+		double xMax = Double.NEGATIVE_INFINITY;
+		double yMin = Double.POSITIVE_INFINITY;
+		double yMax = Double.NEGATIVE_INFINITY;
 		
 		for (int i = 0; i < numPoints; i++) {
-			x[i] = Double.parseDouble(fields[i * 2 + 1]);
-			y[i] = Double.parseDouble(fields[i * 2 + 2]);
+			x[i] = Double.parseDouble(fields[i * 2 + 2]);
+			y[i] = Double.parseDouble(fields[i * 2 + 3]);
 			xMin = Math.min(xMin, x[i]);
 			xMax = Math.max(xMax, x[i]);
 			yMin = Math.min(yMin, y[i]);
@@ -38,7 +37,7 @@ public class TextInputRegionIntersectJoinHandler extends
 		region.setX(x);
 		region.setY(y);
 		item.setPayload(region);
-		
+
 		MbrWritable mbr = new MbrWritable();
 		mbr.setxMin(xMin);
 		mbr.setxMax(xMax);
