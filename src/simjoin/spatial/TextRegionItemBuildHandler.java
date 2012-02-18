@@ -4,17 +4,28 @@ import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Text;
 
-public abstract class TextInputRegionIntersectJoinHandler extends
-		RegionIntersectJoinHandler<LongWritable, Text> {
+import simjoin.core.ItemWritable;
+import simjoin.core.handler.ItemBuildHandler;
 
+public class TextRegionItemBuildHandler extends
+		ItemBuildHandler<LongWritable, Text, RegionItemWritable> {
+	
+	public TextRegionItemBuildHandler() {
+		super(RegionItemWritable.class);
+	}
+
+	@SuppressWarnings("rawtypes")
 	@Override
-	protected void resetItem(RegionItemWritable item, LongWritable key,
+	public void resetItem(ItemWritable item, LongWritable key,
 			Text value) {
+		
+		RegionItemWritable regionItem = (RegionItemWritable) item;
 		
 		String line = value.toString();
 		String[] fields = line.split(",");
 		
-		item.setId(new IntWritable(Integer.parseInt(fields[0])));
+		regionItem.setId(new IntWritable(Integer.parseInt(fields[0])));
+		
 		int numPoints = Integer.parseInt(fields[1]);
 		double x[] = new double[numPoints];
 		double y[] = new double[numPoints];
@@ -36,13 +47,13 @@ public abstract class TextInputRegionIntersectJoinHandler extends
 		region.setNumPoints(numPoints);
 		region.setX(x);
 		region.setY(y);
-		item.setPayload(region);
+		regionItem.setPayload(region);
 
 		MbrWritable mbr = new MbrWritable();
 		mbr.setxMin(xMin);
 		mbr.setxMax(xMax);
 		mbr.setyMin(yMin);
 		mbr.setyMax(yMax);
-		item.setSignature(mbr);
+		regionItem.setSignature(mbr);
 	}
 }

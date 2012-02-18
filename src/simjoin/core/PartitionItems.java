@@ -12,6 +12,8 @@ import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.lib.output.MultipleOutputs;
 import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
 
+import simjoin.core.handler.ItemBuildHandler;
+import simjoin.core.handler.ItemPartitionHandler;
 import simjoin.spatial.RegionItemWritable;
 
 public class PartitionItems {
@@ -44,7 +46,11 @@ public class PartitionItems {
 
 		private int mask;
 
-		private SimJoinHandler<KEYIN, VALUEIN, ?> handler;
+		private ItemBuildHandler<KEYIN, VALUEIN, ?> itemBuildHandler;
+		
+		private ItemPartitionHandler<?> itemPartitionHandler;
+		
+		private ItemWritable item;
 
 		@SuppressWarnings("unchecked")
 		@Override
@@ -65,18 +71,21 @@ public class PartitionItems {
 			if (hasSignature)
 				mask |= ItemWritable.MASK_SIG;
 			
-			handler = SimJoin.createHandler(conf);
-			handler.setupBuildItem(conf);
-			handler.setupGetPartitions(conf);
+			itemBuildHandler = SimJoin.createItemBuildHandler(conf);
+			itemBuildHandler.setup(conf);
+			item = itemBuildHandler.createItem();
+			
+			itemPartitionHandler = SimJoin.createItemPartitionHandler(conf);
+			itemPartitionHandler.setup(conf);
 		}
 
 		@Override
 		protected void map(KEYIN key, VALUEIN value, Context context)
 				throws IOException, InterruptedException {
-			ItemWritable item = handler.buildItem(key, value);
+			itemBuildHandler.resetItem(item, key, value);
 			item.setMask(mask);
 			
-			List<Integer> pids = handler.getPartitions(item);
+			List<Integer> pids = itemPartitionHandler.getPartitions(item);
 			for (Integer pid : pids)
 				context.write(new IntWritable(pid), item);
 		}
@@ -85,8 +94,8 @@ public class PartitionItems {
 		protected void cleanup(Context context)
 				throws IOException, InterruptedException {
 			Configuration conf = context.getConfiguration();
-			handler.cleanupBuildItem(conf);
-			handler.cleanupGetPartitions(conf);
+			itemPartitionHandler.cleanup(conf);
+			itemBuildHandler.cleanup(conf);
 			super.cleanup(context);
 		}
 	}

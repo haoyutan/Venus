@@ -26,7 +26,7 @@ import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 
 import simjoin.core.SimJoin;
-import simjoin.core.SimJoinHandler;
+import simjoin.core.handler.ItemBuildHandler;
 
 public class GridPartitionIndex extends Configured implements Tool {
 	
@@ -50,9 +50,11 @@ public class GridPartitionIndex extends Configured implements Tool {
 	public static class GridPartitionIndexMapper<KEYIN, VALUEIN> extends
 			Mapper<KEYIN, VALUEIN, IntWritable, DoubleWritable> {
 
-		private SimJoinHandler<KEYIN, VALUEIN, ?> handler;
+		private ItemBuildHandler<KEYIN, VALUEIN, ?> itemBuildHandler;
 		
 		private double xMin, xMax, yMin, yMax;
+		
+		private RegionItemWritable regionItem;
 
 		@SuppressWarnings("unchecked")
 		@Override
@@ -60,8 +62,9 @@ public class GridPartitionIndex extends Configured implements Tool {
 				InterruptedException {
 			super.setup(context);
 			Configuration conf = context.getConfiguration();
-			handler = SimJoin.createHandler(conf);
-			handler.setupBuildItem(conf);
+			itemBuildHandler = SimJoin.createItemBuildHandler(conf);
+			itemBuildHandler.setup(conf);
+			regionItem = (RegionItemWritable) itemBuildHandler.createItem();
 			
 			xMin = Double.POSITIVE_INFINITY;
 			xMax = Double.NEGATIVE_INFINITY;
@@ -72,9 +75,8 @@ public class GridPartitionIndex extends Configured implements Tool {
 		@Override
 		protected void map(KEYIN key, VALUEIN value, Context context)
 				throws IOException, InterruptedException {
-			RegionItemWritable item = (RegionItemWritable) handler.buildItem(
-					key, value);
-			MbrWritable mbr = item.getSignature();
+			itemBuildHandler.resetItem(regionItem, key, value);
+			MbrWritable mbr = regionItem.getSignature();
 			
 			xMin = Math.min(xMin, mbr.getxMin());
 			xMax = Math.max(xMax, mbr.getxMax());
@@ -91,7 +93,7 @@ public class GridPartitionIndex extends Configured implements Tool {
 			context.write(new IntWritable(3), new DoubleWritable(yMax));
 			
 			Configuration conf = context.getConfiguration();
-			handler.cleanupBuildItem(conf);
+			itemBuildHandler.cleanup(conf);
 			super.cleanup(context);
 		}
 	}
@@ -193,11 +195,7 @@ public class GridPartitionIndex extends Configured implements Tool {
 	
 	@Override
 	public int run(String[] args) throws Exception {
-		Configuration conf = getConf();
-		SimJoin.setItemClass(conf, RegionItemWritable.class);
-		SimJoin.setHandlerClass(conf, GridIndexJoinHandler.class);
-		
-		Job job = new Job(conf);
+		Job job = new Job(getConf());
 		job.setJarByClass(getClass());
 		job.setJobName("Step-0-Preprocessing");
 		
@@ -212,6 +210,9 @@ public class GridPartitionIndex extends Configured implements Tool {
 		job.setOutputFormatClass(TextOutputFormat.class);
 		FileOutputFormat.setOutputPath(job, new Path(args[0],
 				DEFAULT_INDEX_DIRNAME));
+		
+		SimJoin.setItemClass(job, RegionItemWritable.class);
+		SimJoin.setItemBuildHandlerClass(job, TextRegionItemBuildHandler.class);
 		
 		return (job.waitForCompletion(true) ? 0 : 1);
 	}

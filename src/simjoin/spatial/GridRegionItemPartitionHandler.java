@@ -7,20 +7,26 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 
 import simjoin.core.ItemWritable;
+import simjoin.core.handler.ItemPartitionHandler;
 import simjoin.spatial.GridPartitionIndex.GridIndex;
 
-public class GridIndexJoinHandler extends TextInputRegionIntersectJoinHandler {
+public class GridRegionItemPartitionHandler extends
+		ItemPartitionHandler<RegionItemWritable> {
 
 	public static final String DEFAULT_INDEX_DIRNAME = GridPartitionIndex.DEFAULT_INDEX_DIRNAME;
 	
 	public static void setGridIndexFile(Configuration conf, Path indexPath) {
 		conf.set(GridPartitionIndex.CONF_INDEX_FILE, indexPath.toString());
 	}
+
+	public GridRegionItemPartitionHandler() {
+		super(RegionItemWritable.class);
+	}
 	
 	private GridIndex gridIndex;
 
 	@Override
-	public void setupGetPartitions(Configuration conf) throws IOException {
+	public void setup(Configuration conf) throws IOException {
 		gridIndex = GridPartitionIndex.loadGridIndex(conf);
 	}
 
