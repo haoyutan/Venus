@@ -1,0 +1,13 @@
+GetRegion.py
+	Convert a shapefile to a text-format region file.
+
+shapefile.py
+	Used by `GetRegion.py'.
+
+sample.region.dat
+	A 100-line sample of a region file converted from shapefile
+	`tl_2010_01001_faces.shp' which can be downloaded from
+	`ftp://ftp2.census.gov/geo/tiger/TIGER2010/FACES/'.
+
+SimJoin_spatial.R
+	R codes that can read region files and plot regions.
