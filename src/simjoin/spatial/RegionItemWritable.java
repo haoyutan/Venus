@@ -1,12 +1,12 @@
 package simjoin.spatial;
 
-import org.apache.hadoop.io.IntWritable;
+import org.apache.hadoop.io.LongWritable;
 
 import simjoin.core.ItemWritable;
 
-public class RegionItemWritable extends ItemWritable<IntWritable, RegionWritable, MbrWritable> {
+public class RegionItemWritable extends ItemWritable<LongWritable, RegionWritable, MbrWritable> {
 	
 	public RegionItemWritable() {
-		super(IntWritable.class, RegionWritable.class, MbrWritable.class, true);
+		super(LongWritable.class, RegionWritable.class, MbrWritable.class, true);
 	}
 }

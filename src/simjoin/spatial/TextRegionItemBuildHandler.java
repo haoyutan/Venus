@@ -1,6 +1,5 @@
 package simjoin.spatial;
 
-import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Text;
 
@@ -24,7 +23,7 @@ public class TextRegionItemBuildHandler extends
 		String line = value.toString();
 		String[] fields = line.split(",");
 		
-		regionItem.setId(new IntWritable(Integer.parseInt(fields[0])));
+		regionItem.setId(new LongWritable(Long.parseLong(fields[0])));
 		
 		int numPoints = Integer.parseInt(fields[1]);
 		double x[] = new double[numPoints];
