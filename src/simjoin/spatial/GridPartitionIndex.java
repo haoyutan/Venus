@@ -25,19 +25,19 @@ import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 
-import simjoin.core.SimJoin;
+import simjoin.core.SimJoinContext;
 import simjoin.core.handler.ItemBuildHandler;
 
 public class GridPartitionIndex extends Configured implements Tool {
 	
-	public static final String CONF_INDEX_FILE = "simjoin.spatial.gridindex.file";
+	public static final String CK_INDEX_FILE = "simjoin.spatial.gridindex.file";
 	
 	public static final String DEFAULT_INDEX_DIRNAME = "_GridIndex";
 	
 	public static GridIndex loadGridIndex(Configuration conf) throws IOException {
-		String indexPath = conf.get(CONF_INDEX_FILE, null);
+		String indexPath = conf.get(CK_INDEX_FILE, null);
 		if (indexPath == null)
-			throw new RuntimeException("Must specify " + CONF_INDEX_FILE);
+			throw new RuntimeException("Must specify " + CK_INDEX_FILE + ".");
 		Path indexFile = new Path(indexPath, "part-r-00000");
 		FileSystem fs = indexFile.getFileSystem(conf);
 		DataInputStream in = fs.open(indexFile);
@@ -62,7 +62,7 @@ public class GridPartitionIndex extends Configured implements Tool {
 				InterruptedException {
 			super.setup(context);
 			Configuration conf = context.getConfiguration();
-			itemBuildHandler = SimJoin.createItemBuildHandler(conf);
+			itemBuildHandler = SimJoinContext.createItemBuildHandler(conf);
 			itemBuildHandler.setup(conf);
 			regionItem = (RegionItemWritable) itemBuildHandler.createItem();
 			
@@ -210,9 +210,11 @@ public class GridPartitionIndex extends Configured implements Tool {
 		job.setOutputFormatClass(TextOutputFormat.class);
 		FileOutputFormat.setOutputPath(job, new Path(args[0],
 				DEFAULT_INDEX_DIRNAME));
-		
-		SimJoin.setItemClass(job, RegionItemWritable.class);
-		SimJoin.setItemBuildHandlerClass(job, TextRegionItemBuildHandler.class);
+
+		SimJoinContext.setItemClass(job.getConfiguration(),
+				RegionItemWritable.class);
+		SimJoinContext.setItemBuildHandlerClass(job.getConfiguration(),
+				TextRegionItemBuildHandler.class, true);
 		
 		return (job.waitForCompletion(true) ? 0 : 1);
 	}

@@ -16,7 +16,7 @@ public class GridRegionItemPartitionHandler extends
 	public static final String DEFAULT_INDEX_DIRNAME = GridPartitionIndex.DEFAULT_INDEX_DIRNAME;
 	
 	public static void setGridIndexFile(Configuration conf, Path indexPath) {
-		conf.set(GridPartitionIndex.CONF_INDEX_FILE,
+		conf.set(GridPartitionIndex.CK_INDEX_FILE,
 				indexPath.toString());
 	}
 

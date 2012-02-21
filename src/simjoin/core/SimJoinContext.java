@@ -1,19 +1,22 @@
 package simjoin.core;
 
-import org.apache.commons.logging.Log;
-import org.apache.commons.logging.LogFactory;
+import java.io.IOException;
+
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.mapreduce.Job;
+import org.apache.hadoop.util.ReflectionUtils;
+import org.apache.hadoop.util.StringUtils;
 
 import simjoin.core.handler.ItemBuildHandler;
 import simjoin.core.handler.ItemPartitionHandler;
 
 public class SimJoinContext extends Configured {
-
-	private static final Log LOG = LogFactory.getLog(SimJoinContext.class);
 	
 	public static final String CK_NAME = "simjoin.name";
+	
+	public static final String CK_WORKDIR = "simjoin.workdir";
 	
 	public static final String CK_ALGO = "simjoin.core.algorithm";
 	public static final String CV_ALGO_AUTO = "auto";
@@ -27,10 +30,6 @@ public class SimJoinContext extends Configured {
 	public static final String CK_HAS_SIG = "simjoin.core.has_signature";
 	
 	public static final String CK_HANDLER_ITEMPARTITION_CLASS = "simjoin.core.handler.itempartition.class";
-	
-	private Job virtualJob;
-	
-	private boolean initialized = false;
 	
 	public static void setSimJoinName(Configuration conf, String simJoinName) {
 		conf.set(CK_NAME, simJoinName);
@@ -46,6 +45,30 @@ public class SimJoinContext extends Configured {
 	
 	public String getSimJoinName() {
 		return getSimJoinName(getConf());
+	}
+	
+	public static void setSimJoinWorkDir(Configuration conf, Path workDir) {
+		workDir = new Path(workDir, "_simjoin");
+		try {
+			workDir = workDir.getFileSystem(conf).makeQualified(workDir);
+		} catch (IOException e) {
+			throw new RuntimeException(e);
+		}
+	    String dirStr = StringUtils.escapeString(workDir.toString());
+		conf.set(CK_WORKDIR, dirStr);
+	}
+	
+	public void setSimJoinWorkDir(Path workDir) {
+		setSimJoinWorkDir(getConf(), workDir);
+	}
+	
+	public static Path getSimJoinWorkDir(Configuration conf) {
+		Path workDir = new Path(conf.get(CK_WORKDIR));
+		return workDir;
+	}
+	
+	public Path getSimJoinWorkDir() {
+		return getSimJoinWorkDir(getConf());
 	}
 	
 	public static void setSimJoinAlgorithm(Configuration conf, String simJoinAlgorithm) {
@@ -97,8 +120,7 @@ public class SimJoinContext extends Configured {
 	@SuppressWarnings("rawtypes")
 	public void setItemBuildHandlerClass(
 			Class<? extends ItemBuildHandler> handlerClass, boolean hasSignature) {
-		setItemBuildHandlerClass(getConf(), ItemBuildHandler.class,
-				hasSignature);
+		setItemBuildHandlerClass(getConf(), handlerClass, hasSignature);
 	}
 
 	@SuppressWarnings({ "unchecked", "rawtypes" })
@@ -145,78 +167,48 @@ public class SimJoinContext extends Configured {
 	public Class<? extends ItemPartitionHandler> getItemPartitionHandlerClass() {
 		return getItemPartitionHandlerClass(getConf());
 	}
-
-	public SimJoinContext(Job virtualJob) {
-		super(new Configuration(virtualJob.getConfiguration()));
-		this.virtualJob = virtualJob;
-	}
-
-	public boolean isInitialized() {
-		return initialized;
-	}
-
-	public void setInitialized(boolean initialized) {
-		this.initialized = initialized;
-	}
-
-	public void initialize() {
-		LOG.info("initialize: Begin...");
-		if (!isInitialized()) {
-			checkVirtualJob();
-			checkMandatoryArguments();
-			setDefaultValues();
-			setInitialized(true);
-			LOG.info("initialize: Done.");
-		} else
-			LOG.info("initialize: Already initialized before.");
+	
+	@SuppressWarnings("rawtypes")
+	public static ItemBuildHandler createItemBuildHandler(Configuration conf) {
+		Class<?> handlerClass = getItemBuildHandlerClass(conf);
+		return (ItemBuildHandler) createInstance(handlerClass, conf);
 	}
 	
-	private void checkVirtualJob() {
+	@SuppressWarnings("rawtypes")
+	public ItemBuildHandler createItemBuildHandler() {
+		return createItemBuildHandler(getConf());
+	}
+	
+	@SuppressWarnings("rawtypes")
+	public static ItemPartitionHandler createItemPartitionHandler(Configuration conf) {
+		Class<?> handlerClass = getItemPartitionHandlerClass(conf);
+		return (ItemPartitionHandler) createInstance(handlerClass, conf);
+	}
+	
+	@SuppressWarnings("rawtypes")
+	public ItemPartitionHandler createItemPartitionHandler() {
+		return createItemPartitionHandler(getConf());
+	}
+	
+	private static Object createInstance(Class<?> theClass, Configuration conf) {
+		Object instance;
 		try {
-			LOG.info("InputFormat: " + virtualJob.getInputFormatClass().getName());
-			LOG.info("OutputFormat: " + virtualJob.getOutputFormatClass().getName());
-		} catch (ClassNotFoundException e) {
+			instance = ReflectionUtils.newInstance(theClass, conf);
+		} catch (Exception e) {
 			throw new RuntimeException(e);
 		}
+		return instance;
 	}
 	
-	private void checkMandatoryArguments() {
-		checkClass(CK_ITEM_CLASS, ItemWritable.class);
-		checkClass(CK_HANDLER_ITEMBUILD_CLASS, ItemBuildHandler.class);
-		checkValue(CK_HAS_SIG);
-		checkClass(CK_HANDLER_ITEMPARTITION_CLASS, ItemPartitionHandler.class);
+	public SimJoinContext(Configuration conf) {
+		super(new Configuration(conf));
 	}
 	
-	private void checkClass(String confKey, Class<?> superClass) {
-		Configuration conf  = getConf();
-		Class<?> theClass = conf.getClass(confKey, null);
-		if (theClass == null)
-			throw new RuntimeException("Must specify " + confKey + ".");
-		if (!superClass.isAssignableFrom(theClass))
-			throw new RuntimeException("" + theClass + " is not a subclass of "
-					+ superClass + ".");
-		LOG.info(confKey + ": " + theClass.getName());
+	public SimJoinContext(Job virtualJob) {
+		this(virtualJob.getConfiguration());
 	}
 	
-	private void checkValue(String confKey) {
-		Configuration conf  = getConf();
-		String value = conf.get(confKey, null);
-		if (value == null)
-			throw new RuntimeException("Must specify " + confKey + ".");
-		LOG.info(confKey + ": " + value);
-	}
-	
-	private void setDefaultValues() {
-		setIfNotSpecified(CK_ALGO, CV_ALGO_AUTO);
-	}
-	
-	private void setIfNotSpecified(String confKey, String defaultValue) {
-		Configuration conf  = getConf();
-		String value = conf.get(confKey, null);
-		if (value == null) {
-			LOG.info(confKey + " is not specified. Use the default value.");
-			conf.set(confKey, defaultValue);
-		}
-		LOG.info(confKey + ": " + conf.get(confKey, null));
+	public SimJoinContext(SimJoinContext context) {
+		this(context.getConf());
 	}
 }

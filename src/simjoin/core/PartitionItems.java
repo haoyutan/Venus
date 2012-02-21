@@ -7,8 +7,8 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.io.SequenceFile.CompressionType;
-import org.apache.hadoop.io.compress.SnappyCodec;
 import org.apache.hadoop.io.Text;
+import org.apache.hadoop.io.compress.SnappyCodec;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.Reducer;
@@ -25,13 +25,12 @@ public class PartitionItems {
 		return String.format("P-%05d", partitionId);
 	}
 	
-	@SuppressWarnings({ "rawtypes", "unchecked" })
+	@SuppressWarnings({ "rawtypes" })
 	public static void configureJob(Job job) {
 		Configuration conf = job.getConfiguration();
-		Class<? extends ItemWritable> itemClass = (Class<? extends ItemWritable>) conf
-				.getClass(SimJoin.CONF_ITEM_CLASS, null);
+		Class<? extends ItemWritable> itemClass = SimJoinContext.getItemClass(conf);
 		if (itemClass == null)
-			throw new RuntimeException("Must specify item class");
+			throw new RuntimeException("Must specify item class.");
 		
 		job.setMapperClass(PartitionItemsMapper.class);
 		job.setMapOutputKeyClass(IntWritable.class);
@@ -72,10 +71,10 @@ public class PartitionItems {
 			super.setup(context);
 			Configuration conf = context.getConfiguration();
 			
-			hasSignature = conf.getBoolean(SimJoin.CONF_HAS_SIG, false);
+			hasSignature = SimJoinContext.hasSignature(conf);
 			outputPayload = true;
 			if (hasSignature)
-				outputPayload = conf.getBoolean(SimJoin.CONF_OUTPUT_PLD, false);
+				outputPayload = conf.getBoolean(SimJoin.CK_PLAN_OUTPUTPAYLOAD, false);
 
 			mask = ItemWritable.MASK_ID;
 			if (outputPayload)
@@ -83,11 +82,11 @@ public class PartitionItems {
 			if (hasSignature)
 				mask |= ItemWritable.MASK_SIG;
 			
-			itemBuildHandler = SimJoin.createItemBuildHandler(conf);
+			itemBuildHandler = SimJoinContext.createItemBuildHandler(conf);
 			itemBuildHandler.setup(conf);
 			item = itemBuildHandler.createItem();
 			
-			itemPartitionHandler = SimJoin.createItemPartitionHandler(conf);
+			itemPartitionHandler = SimJoinContext.createItemPartitionHandler(conf);
 			itemPartitionHandler.setup(conf);
 		}
 
