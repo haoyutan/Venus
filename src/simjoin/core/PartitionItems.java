@@ -22,7 +22,7 @@ import simjoin.core.handler.ItemPartitionHandler;
 public class PartitionItems {
 	
 	public static String getPartitionName(int partitionId) {
-		return String.format("P-%05d", partitionId);
+		return String.format("P-%010d", partitionId);
 	}
 	
 	@SuppressWarnings({ "rawtypes" })

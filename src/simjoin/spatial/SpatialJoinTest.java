@@ -20,22 +20,27 @@ public class SpatialJoinTest extends Configured implements Tool {
 		Path inputPath = new Path(args[0]);
 		Path outputPath = new Path(args[1]);
 		
-		Job virtualJob = new Job(getConf());
-		virtualJob.setInputFormatClass(TextInputFormat.class);
-		FileInputFormat.addInputPath(virtualJob, inputPath);
-		virtualJob.setOutputFormatClass(TextOutputFormat.class);
-		FileOutputFormat.setOutputPath(virtualJob, outputPath);
+//		Job virtualJob = new Job(getConf());
+//		virtualJob.setInputFormatClass(TextInputFormat.class);
+//		FileInputFormat.addInputPath(virtualJob, inputPath);
+//		virtualJob.setOutputFormatClass(TextOutputFormat.class);
+//		FileOutputFormat.setOutputPath(virtualJob, outputPath);
+//		
+//		SimJoinContext sjCtx = new SimJoinContext(virtualJob);
+//		sjCtx.setSimJoinName("Spatial Join");
+//		sjCtx.setSimJoinWorkDir(outputPath);
+//		sjCtx.setItemClass(RegionItemWritable.class);
+//		sjCtx.setItemBuildHandlerClass(TextRegionItemBuildHandler.class, true);
+//		sjCtx.setItemPartitionHandlerClass(GridRegionItemPartitionHandler.class);
+//		GridRegionItemPartitionHandler.setGridIndexFile(sjCtx.getConf(),
+//				new Path(inputPath,
+//						GridRegionItemPartitionHandler.DEFAULT_INDEX_DIRNAME));
+//		
+//		SimJoin simjoin = new SimJoin(sjCtx);
+//		simjoin.run();
 		
-		SimJoinContext sjCtx = new SimJoinContext(virtualJob);
-		sjCtx.setSimJoinName("Spatial Join");
+		SimJoinContext sjCtx = new SimJoinContext(getConf());
 		sjCtx.setSimJoinWorkDir(outputPath);
-		sjCtx.setItemClass(RegionItemWritable.class);
-		sjCtx.setItemBuildHandlerClass(TextRegionItemBuildHandler.class, true);
-		sjCtx.setItemPartitionHandlerClass(GridRegionItemPartitionHandler.class);
-		GridRegionItemPartitionHandler.setGridIndexFile(sjCtx.getConf(),
-				new Path(inputPath,
-						GridRegionItemPartitionHandler.DEFAULT_INDEX_DIRNAME));
-		
 		SimJoin simjoin = new SimJoin(sjCtx);
 		simjoin.run();
 		
