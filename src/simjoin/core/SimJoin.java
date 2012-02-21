@@ -40,8 +40,8 @@ public class SimJoin {
 		job.getConfiguration().setBoolean(CONF_HAS_SIG, hasSignature);
 	}
 	
-	public static void setOutputPayload(Configuration conf, boolean outputPayload) {
-		conf.setBoolean(CONF_OUTPUT_PLD, outputPayload);
+	public static void setOutputPayload(Job job, boolean outputPayload) {
+		job.getConfiguration().setBoolean(CONF_OUTPUT_PLD, outputPayload);
 	}
 	
 	@SuppressWarnings("rawtypes")

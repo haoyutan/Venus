@@ -58,6 +58,8 @@ function (file)
         n <- scan(con, sep = ",", what = integer(), nmax = 1, 
             quiet = T)
         xy <- scan(con, sep = ",", what = double(), quiet = T)
+        close(con)
+
         x <- xy[1:n * 2 - 1]
         y <- xy[1:n * 2]
         regions[[i]] <- as.sdbRegion(id, x, y)

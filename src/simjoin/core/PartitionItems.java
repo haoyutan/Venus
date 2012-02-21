@@ -6,17 +6,24 @@ import java.util.List;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.NullWritable;
+import org.apache.hadoop.io.SequenceFile.CompressionType;
+import org.apache.hadoop.io.compress.SnappyCodec;
+import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.lib.output.MultipleOutputs;
+import org.apache.hadoop.mapreduce.lib.output.SequenceFileOutputFormat;
 import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
 
 import simjoin.core.handler.ItemBuildHandler;
 import simjoin.core.handler.ItemPartitionHandler;
-import simjoin.spatial.RegionItemWritable;
 
 public class PartitionItems {
+	
+	public static String getPartitionName(int partitionId) {
+		return String.format("P-%05d", partitionId);
+	}
 	
 	@SuppressWarnings({ "rawtypes", "unchecked" })
 	public static void configureJob(Job job) {
@@ -31,9 +38,14 @@ public class PartitionItems {
 		job.setMapOutputValueClass(itemClass);
 		
 		job.setReducerClass(PartitionItemsReducer.class);
-		MultipleOutputs.addNamedOutput(job, "dummy",
-				TextOutputFormat.class, RegionItemWritable.class,
-				NullWritable.class);
+		job.setOutputFormatClass(SequenceFileOutputFormat.class);
+		job.setOutputKeyClass(itemClass);
+		job.setOutputValueClass(NullWritable.class);
+		SequenceFileOutputFormat.setCompressOutput(job, true);
+		SequenceFileOutputFormat.setOutputCompressionType(job, CompressionType.BLOCK);
+		SequenceFileOutputFormat.setOutputCompressorClass(job, SnappyCodec.class);
+		MultipleOutputs.addNamedOutput(job, "metadata", TextOutputFormat.class,
+				Text.class, NullWritable.class);
 	}
 	
 	@SuppressWarnings("rawtypes")
@@ -118,8 +130,14 @@ public class PartitionItems {
 		@Override
 		protected void reduce(IntWritable key, Iterable<VALUEIN> values,
 				Context context) throws IOException, InterruptedException {
-			for (VALUEIN value : values)
-				mos.write(value, NullWritable.get(), "P-" + key.get());
+			String partitionName = getPartitionName(key.get());
+			long count = 0;
+			for (VALUEIN value : values) {
+				mos.write(value, NullWritable.get(), partitionName);
+				++count;
+			}
+			String metadataString = partitionName + "," + count;
+			mos.write("metadata", new Text(metadataString), NullWritable.get());
 		}
 
 		@Override
