@@ -24,7 +24,7 @@ public class SimJoin {
 	// CP stands for checkpoint
 	private static final String CP_00_INITIALIZE = "Stage-00-Initialize";
 	private static final String CP_01_PLANGLOBAL = "Stage-01-PlanGlobal";
-	private static final String CP_02_ITEMPARTITION = "Stage-02-ItemPartition";
+	//private static final String CP_02_ITEMPARTITION = "Stage-02-ItemPartition";
 	
 	private SimJoinContext sjCtx;
 	
@@ -128,7 +128,7 @@ public class SimJoin {
 		initialize();
 		planGlobal();
 		return 0;
-//		
+		
 //		Job job = new Job(sjCtx.getConf());
 //		job.setJarByClass(getClass());
 //		job.setJobName(CP_02_ITEMPARTITION);
