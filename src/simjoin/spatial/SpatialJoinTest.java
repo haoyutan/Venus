@@ -36,11 +36,8 @@ public class SpatialJoinTest extends Configured implements Tool {
 				new Path(inputPath,
 						GridRegionItemPartitionHandler.DEFAULT_INDEX_DIRNAME));
 		
+		//sjConf.setSimJoinAlgorithm(SimJoinConf.CV_ALGO_CLONE);
 		ToolRunner.run(new SimJoin(sjConf), args);
-		
-//		SimJoin simjoin = new SimJoin(sjConf);
-//		simjoin.run();
-		
 		return 0;
 	}
 	

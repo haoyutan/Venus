@@ -25,6 +25,8 @@ public class SimJoinPlan extends Configured implements Tool {
 	
 	private static final String CK_PLAN_PREFIX = "simjoin.core.plan";
 	
+	public static final String CK_PLAN_ALGO = CK_PLAN_PREFIX + ".algorithm";
+	
 	private static final String FILENAME_CONF = "simjoin-conf-with-plan.dat";
 	private static final String FILENAME_XML = "simjoin-conf-with-plan.xml";
 	
@@ -115,11 +117,10 @@ public class SimJoinPlan extends Configured implements Tool {
 		LOG.info("Making similarity join plan...");
 		Configuration conf = getConf();
 		String algorithm = SimJoinConf.getSimJoinAlgorithm(conf);
-		if (!SimJoinConf.CV_ALGO_CLONE.equals(algorithm)) {
-			LOG.warn("  Not support algorithm '" + algorithm
-					+ "'. Change to 'clone'.");
-			conf.set(CK_PLAN_PREFIX + ".algorithm", SimJoinConf.CV_ALGO_CLONE);
-		}
+		
+		if (SimJoinConf.CV_ALGO_AUTO.equals(algorithm))
+			algorithm = SimJoinConf.CV_ALGO_SHADOW;
+		conf.set(CK_PLAN_ALGO, algorithm);
 		LOG.info("Making similarity join plan... Done.");
 	}
 

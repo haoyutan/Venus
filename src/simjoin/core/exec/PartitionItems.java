@@ -3,8 +3,11 @@ package simjoin.core.exec;
 import java.io.IOException;
 import java.util.List;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.NullWritable;
@@ -25,9 +28,12 @@ import simjoin.core.SimJoinConf;
 import simjoin.core.SimJoinUtils;
 import simjoin.core.handler.ItemBuildHandler;
 import simjoin.core.handler.ItemPartitionHandler;
-import simjoin.core.tmp.SimJoinDeprecated;
 
 public class PartitionItems extends Configured implements Tool {
+	
+	private static final Log LOG = LogFactory.getLog(PartitionItems.class);
+
+	private static final String CK_OUTPUT_PAYLOAD = "simjoin.exec.partitionitems.output_payload";
 	
 	public static String getPartitionName(int partitionId) {
 		return String.format("P-%010d", partitionId);
@@ -84,7 +90,7 @@ public class PartitionItems extends Configured implements Tool {
 			hasSignature = SimJoinConf.hasSignature(conf);
 			outputPayload = true;
 			if (hasSignature)
-				outputPayload = conf.getBoolean(SimJoinDeprecated.CK_PLAN_OUTPUTPAYLOAD, false);
+				outputPayload = conf.getBoolean(CK_OUTPUT_PAYLOAD, false);
 
 			mask = ItemWritable.MASK_ID;
 			if (outputPayload)
@@ -157,18 +163,51 @@ public class PartitionItems extends Configured implements Tool {
 		}
 	}
 	
+	private Path workDir;
+	
 	public PartitionItems(Configuration conf) {
 		super(conf);
+		workDir = SimJoinConf.getWorkDir(conf);
 	}
 
 	@Override
 	public int run(String[] args) throws Exception {
-		Job job = new Job(getConf());
-		job.setJobName("Partition Items");
-
-		Path itemPartitionPath = new Path(SimJoinConf.getWorkDir(getConf()),
-				"test-ItemPartition");
-		FileOutputFormat.setOutputPath(job, itemPartitionPath);
+		if (recover())
+			return 0;
+		
+		int ret = runJob(args);
+		if (ret == 0)
+			ExecUtils.setExecSuccess(getConf(), workDir);
+		return ret;
+	}
+	
+	private boolean recover() throws IOException {
+		if (ExecUtils.isExecSuccess(getConf(), workDir)) {
+			LOG.info("Found saved results. Skip this stage.");
+			return true;
+		} else
+			return false;
+	}
+	
+	private int runJob(String[] args) throws Exception {
+		Configuration conf = getConf();
+		
+		// delete output path
+		FileSystem fs = workDir.getFileSystem(conf);
+		fs.delete(workDir, true);
+		
+		// plan
+		String algorithm = conf.get(SimJoinPlan.CK_PLAN_ALGO);
+		if (SimJoinConf.CV_ALGO_CLONE.equals(algorithm))
+			conf.setBoolean(CK_OUTPUT_PAYLOAD, true);
+		else
+			conf.setBoolean(CK_OUTPUT_PAYLOAD, false);
+		
+		// execute job
+		Job job = new Job(conf);
+		String simJoinName = SimJoinConf.getSimJoinName(conf);
+		job.setJobName(simJoinName + "-ItemsPartition");
+		FileOutputFormat.setOutputPath(job, workDir);
 		configureJob(job);
 		return (job.waitForCompletion(true) ? 0 : 1);
 	}

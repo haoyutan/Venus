@@ -38,7 +38,7 @@ public class SimJoin extends Configured implements Tool {
 		SimJoinConf.setWorkDir(conf, new Path(workDir, "Stage-01-PartitionItems"));
 		PartitionItems partitionItems = new PartitionItems(conf);
 		ret = partitionItems.run(null);
-		LOG.info("Stage-00-PartitionItems: Finished with success.");
+		LOG.info("Stage-01-PartitionItems: Finished with success.");
 		
 		return ret;
 	}
