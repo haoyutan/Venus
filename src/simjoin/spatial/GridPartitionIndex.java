@@ -25,7 +25,8 @@ import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
 import org.apache.hadoop.util.Tool;
 import org.apache.hadoop.util.ToolRunner;
 
-import simjoin.core.SimJoinContext;
+import simjoin.core.SimJoinConf;
+import simjoin.core.SimJoinUtils;
 import simjoin.core.handler.ItemBuildHandler;
 
 public class GridPartitionIndex extends Configured implements Tool {
@@ -62,7 +63,7 @@ public class GridPartitionIndex extends Configured implements Tool {
 				InterruptedException {
 			super.setup(context);
 			Configuration conf = context.getConfiguration();
-			itemBuildHandler = SimJoinContext.createItemBuildHandler(conf);
+			itemBuildHandler = SimJoinUtils.createItemBuildHandler(conf);
 			itemBuildHandler.setup(conf);
 			regionItem = (RegionItemWritable) itemBuildHandler.createItem();
 			
@@ -211,9 +212,9 @@ public class GridPartitionIndex extends Configured implements Tool {
 		FileOutputFormat.setOutputPath(job, new Path(args[0],
 				DEFAULT_INDEX_DIRNAME));
 
-		SimJoinContext.setItemClass(job.getConfiguration(),
+		SimJoinConf.setItemClass(job.getConfiguration(),
 				RegionItemWritable.class);
-		SimJoinContext.setItemBuildHandlerClass(job.getConfiguration(),
+		SimJoinConf.setItemBuildHandlerClass(job.getConfiguration(),
 				TextRegionItemBuildHandler.class, true);
 		
 		return (job.waitForCompletion(true) ? 0 : 1);

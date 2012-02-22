@@ -1,9 +1,11 @@
-package simjoin.core;
+package simjoin.core.exec;
 
 import java.io.IOException;
 import java.util.List;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.conf.Configured;
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.io.SequenceFile.CompressionType;
@@ -12,25 +14,33 @@ import org.apache.hadoop.io.compress.SnappyCodec;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.Reducer;
+import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.mapreduce.lib.output.MultipleOutputs;
 import org.apache.hadoop.mapreduce.lib.output.SequenceFileOutputFormat;
 import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
+import org.apache.hadoop.util.Tool;
 
+import simjoin.core.ItemWritable;
+import simjoin.core.SimJoinConf;
+import simjoin.core.SimJoinUtils;
 import simjoin.core.handler.ItemBuildHandler;
 import simjoin.core.handler.ItemPartitionHandler;
+import simjoin.core.tmp.SimJoinDeprecated;
 
-public class PartitionItems {
+public class PartitionItems extends Configured implements Tool {
 	
 	public static String getPartitionName(int partitionId) {
 		return String.format("P-%010d", partitionId);
 	}
 	
 	@SuppressWarnings({ "rawtypes" })
-	public static void configureJob(Job job) {
+	private void configureJob(Job job) {
 		Configuration conf = job.getConfiguration();
-		Class<? extends ItemWritable> itemClass = SimJoinContext.getItemClass(conf);
+		Class<? extends ItemWritable> itemClass = SimJoinConf.getItemClass(conf);
 		if (itemClass == null)
 			throw new RuntimeException("Must specify item class.");
+
+		job.setJarByClass(getClass());
 		
 		job.setMapperClass(PartitionItemsMapper.class);
 		job.setMapOutputKeyClass(IntWritable.class);
@@ -71,10 +81,10 @@ public class PartitionItems {
 			super.setup(context);
 			Configuration conf = context.getConfiguration();
 			
-			hasSignature = SimJoinContext.hasSignature(conf);
+			hasSignature = SimJoinConf.hasSignature(conf);
 			outputPayload = true;
 			if (hasSignature)
-				outputPayload = conf.getBoolean(SimJoin.CK_PLAN_OUTPUTPAYLOAD, false);
+				outputPayload = conf.getBoolean(SimJoinDeprecated.CK_PLAN_OUTPUTPAYLOAD, false);
 
 			mask = ItemWritable.MASK_ID;
 			if (outputPayload)
@@ -82,11 +92,11 @@ public class PartitionItems {
 			if (hasSignature)
 				mask |= ItemWritable.MASK_SIG;
 			
-			itemBuildHandler = SimJoinContext.createItemBuildHandler(conf);
+			itemBuildHandler = SimJoinUtils.createItemBuildHandler(conf);
 			itemBuildHandler.setup(conf);
 			item = itemBuildHandler.createItem();
 			
-			itemPartitionHandler = SimJoinContext.createItemPartitionHandler(conf);
+			itemPartitionHandler = SimJoinUtils.createItemPartitionHandler(conf);
 			itemPartitionHandler.setup(conf);
 		}
 
@@ -145,5 +155,21 @@ public class PartitionItems {
 			mos.close();
 			super.cleanup(context);
 		}
+	}
+	
+	public PartitionItems(Configuration conf) {
+		super(conf);
+	}
+
+	@Override
+	public int run(String[] args) throws Exception {
+		Job job = new Job(getConf());
+		job.setJobName("Partition Items");
+
+		Path itemPartitionPath = new Path(SimJoinConf.getWorkDir(getConf()),
+				"test-ItemPartition");
+		FileOutputFormat.setOutputPath(job, itemPartitionPath);
+		configureJob(job);
+		return (job.waitForCompletion(true) ? 0 : 1);
 	}
 }
