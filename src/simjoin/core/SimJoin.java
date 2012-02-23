@@ -13,6 +13,8 @@ import simjoin.core.exec.SimJoinPlan;
 public class SimJoin extends Configured implements Tool {
 	
 	private static final Log LOG = LogFactory.getLog(SimJoin.class);
+	
+	private Path workDir;
 
 	public SimJoin(Configuration conf) {
 		super(conf);
@@ -23,7 +25,7 @@ public class SimJoin extends Configured implements Tool {
 		int ret = -1;
 	
 		Configuration conf = new Configuration(getConf());
-		Path workDir = SimJoinConf.getWorkDir(conf);
+		workDir = SimJoinConf.getWorkDir(conf);
 		
 		LOG.info("Stage-00-SimJoinPlan: Start...");
 		SimJoinConf.setWorkDir(conf, new Path(workDir, "Stage-00-SimJoinPlan"));
@@ -33,12 +35,54 @@ public class SimJoin extends Configured implements Tool {
 		
 		Configuration plan = simJoinPlan.getPlan();
 		
-		LOG.info("Stage-01-PartitionItems: Start...");
+		// plan
+		String algorithm = conf.get(SimJoinPlan.CK_PLAN_ALGO);
+		if (SimJoinConf.CV_ALGO_CLONE.equals(algorithm))
+			doCloneJoin(plan, args);
+		else if (SimJoinConf.CV_ALGO_SHADOW.equals(algorithm))
+			doShadowJoin(plan, args);
+		else {
+			LOG.error("Does not support planned algorithm: " + algorithm);
+			ret = -1;
+		}
+			
+		return ret;
+	}
+	
+	private int doCloneJoin(Configuration plan, String[] args) throws Exception {
+		int ret = -1;
+		final String ALGONAME = "CloneJoin";
+		String stageName;
+		Configuration conf;
+		
+		// Stage 01
+		stageName = "Stage-01-" + ALGONAME + "-PartitionItems";
 		conf = new Configuration(plan);
-		SimJoinConf.setWorkDir(conf, new Path(workDir, "Stage-01-PartitionItems"));
+		conf.setBoolean(PartitionItems.CK_OUTPUT_PAYLOAD, true);
+		LOG.info(stageName + ": Start...");
+		SimJoinConf.setWorkDir(conf, new Path(workDir, stageName));
 		PartitionItems partitionItems = new PartitionItems(conf);
 		ret = partitionItems.run(null);
-		LOG.info("Stage-01-PartitionItems: Finished with success.");
+		LOG.info(stageName + ": Finished with success.");
+		
+		return ret;
+	}
+	
+	private int doShadowJoin(Configuration plan, String[] args) throws Exception {
+		int ret = -1;
+		final String ALGONAME = "ShadowJoin";
+		String stageName;
+		Configuration conf;
+		
+		// Stage 01
+		stageName = "Stage-01-" + ALGONAME + "-PartitionItems";
+		conf = new Configuration(plan);
+		conf.setBoolean(PartitionItems.CK_OUTPUT_PAYLOAD, false);
+		LOG.info(stageName + ": Start...");
+		SimJoinConf.setWorkDir(conf, new Path(workDir, stageName));
+		PartitionItems partitionItems = new PartitionItems(conf);
+		ret = partitionItems.run(null);
+		LOG.info(stageName + ": Finished with success.");
 		
 		return ret;
 	}

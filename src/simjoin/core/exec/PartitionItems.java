@@ -1,16 +1,25 @@
 package simjoin.core.exec;
 
 import java.io.IOException;
+import java.io.OutputStreamWriter;
+import java.io.PrintWriter;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
+import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.PathFilter;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.NullWritable;
+import org.apache.hadoop.io.SequenceFile;
 import org.apache.hadoop.io.SequenceFile.CompressionType;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.compress.SnappyCodec;
@@ -20,7 +29,6 @@ import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.mapreduce.lib.output.MultipleOutputs;
 import org.apache.hadoop.mapreduce.lib.output.SequenceFileOutputFormat;
-import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
 import org.apache.hadoop.util.Tool;
 
 import simjoin.core.ItemWritable;
@@ -33,11 +41,11 @@ public class PartitionItems extends Configured implements Tool {
 	
 	private static final Log LOG = LogFactory.getLog(PartitionItems.class);
 
-	private static final String CK_OUTPUT_PAYLOAD = "simjoin.exec.partitionitems.output_payload";
+	public static final String CK_OUTPUT_PAYLOAD = "simjoin.exec.partitionitems.output_payload";
 	
-	public static String getPartitionName(int partitionId) {
-		return String.format("P-%010d", partitionId);
-	}
+	private static final String PARTITION__FILENAME_PREFIX = "P-";
+	
+	public static final String FILENAME_SUMMARY = "_partition_summary.csv";
 	
 	@SuppressWarnings({ "rawtypes" })
 	private void configureJob(Job job) {
@@ -59,7 +67,7 @@ public class PartitionItems extends Configured implements Tool {
 		SequenceFileOutputFormat.setCompressOutput(job, true);
 		SequenceFileOutputFormat.setOutputCompressionType(job, CompressionType.BLOCK);
 		SequenceFileOutputFormat.setOutputCompressorClass(job, SnappyCodec.class);
-		MultipleOutputs.addNamedOutput(job, "metadata", TextOutputFormat.class,
+		MultipleOutputs.addNamedOutput(job, "metadata", SequenceFileOutputFormat.class,
 				Text.class, NullWritable.class);
 	}
 	
@@ -151,7 +159,7 @@ public class PartitionItems extends Configured implements Tool {
 				mos.write(value, NullWritable.get(), partitionName);
 				++count;
 			}
-			String metadataString = partitionName + "," + count;
+			String metadataString = "" + key.get() + "," + count;
 			mos.write("metadata", new Text(metadataString), NullWritable.get());
 		}
 
@@ -176,14 +184,16 @@ public class PartitionItems extends Configured implements Tool {
 			return 0;
 		
 		int ret = runJob(args);
-		if (ret == 0)
+		if (ret == 0) {
+			createPartitionSummary();
 			ExecUtils.setExecSuccess(getConf(), workDir);
+		}
 		return ret;
 	}
 	
 	private boolean recover() throws IOException {
 		if (ExecUtils.isExecSuccess(getConf(), workDir)) {
-			LOG.info("Found saved results. Skip this stage.");
+			LOG.info("Found saved results. Skip.");
 			return true;
 		} else
 			return false;
@@ -196,13 +206,6 @@ public class PartitionItems extends Configured implements Tool {
 		FileSystem fs = workDir.getFileSystem(conf);
 		fs.delete(workDir, true);
 		
-		// plan
-		String algorithm = conf.get(SimJoinPlan.CK_PLAN_ALGO);
-		if (SimJoinConf.CV_ALGO_CLONE.equals(algorithm))
-			conf.setBoolean(CK_OUTPUT_PAYLOAD, true);
-		else
-			conf.setBoolean(CK_OUTPUT_PAYLOAD, false);
-		
 		// execute job
 		Job job = new Job(conf);
 		String simJoinName = SimJoinConf.getSimJoinName(conf);
@@ -210,5 +213,92 @@ public class PartitionItems extends Configured implements Tool {
 		FileOutputFormat.setOutputPath(job, workDir);
 		configureJob(job);
 		return (job.waitForCompletion(true) ? 0 : 1);
+	}
+	
+	private void createPartitionSummary() throws IOException {
+		LOG.info("Creating summary file...");
+		Configuration conf = getConf();
+		FileSystem fs = workDir.getFileSystem(conf);
+
+		// get name and size of each partition file
+		Map<Integer, Long> partitionFilesizes = new HashMap<Integer, Long>();
+		Map<Integer, String> partitionFilenames = new HashMap<Integer, String>();
+		FileStatus[] partitionFileStatus = fs.listStatus(workDir,
+				new PrefixPathFilter(PARTITION__FILENAME_PREFIX));
+		for (FileStatus status : partitionFileStatus) {
+			String filename = status.getPath().getName();
+			int partitionId = getPartitionId(filename);
+			partitionFilesizes.put(partitionId, status.getLen());
+			partitionFilenames.put(partitionId, filename);
+		}
+		LOG.info("  Name and size loaded.");
+
+		// get the number of records in each partition
+		Map<Integer, Long> partitionNumRecords = new HashMap<Integer, Long>();
+		FileStatus[] metaFileStatus = fs.listStatus(workDir,
+				new PrefixPathFilter("metadata-"));
+		for (FileStatus status : metaFileStatus) {
+			SequenceFile.Reader reader = new SequenceFile.Reader(fs,
+					status.getPath(), conf);
+			Text line = new Text();
+			while (reader.next(line)) {
+				String[] fields = line.toString().split(",");
+				int partitionId = Integer.parseInt(fields[0]);
+				long numRecords = Long.parseLong(fields[1]);
+				partitionNumRecords.put(partitionId, numRecords);
+			}
+			reader.close();
+		}
+		LOG.info("  Number of records loaded.");
+		
+		// output summary file
+		PrintWriter writer = new PrintWriter(new OutputStreamWriter(fs.create(
+				new Path(workDir, FILENAME_SUMMARY), true)));
+		writer.println("id,filename,filesize,numRecords");
+		List<Integer> partitionIdList = new ArrayList<Integer>(
+				partitionNumRecords.keySet());
+		Collections.sort(partitionIdList);
+		for (int partitionId : partitionIdList) {
+			String filename = partitionFilenames.get(partitionId);
+			long filesize = partitionFilesizes.get(partitionId);
+			long numRecords = partitionNumRecords.get(partitionId);
+			writer.printf("%d,%s,%d,%d\n", partitionId, filename, filesize,
+					numRecords);
+		}
+		writer.close();
+		LOG.info("  Summary file written.");
+		
+		// remove useless files (metadata-* and part-r-*)
+		for (FileStatus status : metaFileStatus)
+			fs.delete(status.getPath(), true);
+		FileStatus[] partFileStatus = fs.listStatus(workDir,
+				new PrefixPathFilter("part-r-"));
+		for (FileStatus status : partFileStatus)
+			fs.delete(status.getPath(), true);
+		LOG.info("  Useless files removed.");
+		
+		LOG.info("Creating summary file... Done.");
+	}
+
+	private static String getPartitionName(int partitionId) {
+		return String.format("%s%010d", PARTITION__FILENAME_PREFIX, partitionId);
+	}
+	
+	private static int getPartitionId(String partitionName) {
+		return Integer.parseInt(partitionName.substring(2, 12));
+	}
+	
+	private static class PrefixPathFilter implements PathFilter {
+		
+		private String prefix;
+		
+		public PrefixPathFilter(String prefix) {
+			this.prefix = prefix;
+		}
+
+		@Override
+		public boolean accept(Path path) {
+			return path.getName().startsWith(prefix);
+		}
 	}
 }
