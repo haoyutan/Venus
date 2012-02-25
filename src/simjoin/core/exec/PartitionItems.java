@@ -1,6 +1,8 @@
 package simjoin.core.exec;
 
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
 import java.util.ArrayList;
@@ -41,7 +43,7 @@ public class PartitionItems extends Configured implements Tool {
 	
 	private static final Log LOG = LogFactory.getLog(PartitionItems.class);
 
-	public static final String CK_OUTPUT_PAYLOAD = "simjoin.exec.partitionitems.output_payload";
+	public static final String CK_OUTPUT_PAYLOAD = "simjoin.core.exec.partitionitems.output_payload";
 	
 	private static final String PARTITION__FILENAME_PREFIX = "P-";
 	
@@ -299,6 +301,70 @@ public class PartitionItems extends Configured implements Tool {
 		@Override
 		public boolean accept(Path path) {
 			return path.getName().startsWith(prefix);
+		}
+	}
+	
+	public static Map<Integer, PartitionInfo> getPartitionInfo(
+			Configuration conf, Path path) throws IOException {
+		FileSystem fs = path.getFileSystem(conf);
+		FileStatus status = fs.getFileStatus(path);
+		if (status.isDir())
+			path = new Path(path, FILENAME_SUMMARY);
+		Path partitionsDir = path.getParent();
+		
+		BufferedReader reader = new BufferedReader(new InputStreamReader(
+				fs.open(path)));
+		String line = reader.readLine(); // consume csv header
+		Map<Integer, PartitionInfo> infoMap = new HashMap<Integer, PartitionInfo>();
+		while ((line = reader.readLine()) != null) {
+			String[] fields = line.split(",");
+			PartitionInfo info = new PartitionInfo();
+			info.setId(Integer.parseInt(fields[0]));
+			info.setPath(new Path(partitionsDir, fields[1]));
+			info.setSize(Long.parseLong(fields[2]));
+			info.setNumRecords(Long.parseLong(fields[3]));
+			infoMap.put(info.getId(), info);
+		}
+		reader.close();
+		return infoMap;
+	}
+	
+	public static class PartitionInfo {
+		private int id;
+		private Path path;
+		private long size;
+		private long numRecords;
+		
+		public int getId() {
+			return id;
+		}
+		
+		public void setId(int id) {
+			this.id = id;
+		}
+		
+		public Path getPath() {
+			return path;
+		}
+		
+		public void setPath(Path path) {
+			this.path = path;
+		}
+		
+		public long getSize() {
+			return size;
+		}
+		
+		public void setSize(long size) {
+			this.size = size;
+		}
+		
+		public long getNumRecords() {
+			return numRecords;
+		}
+		
+		public void setNumRecords(long numRecords) {
+			this.numRecords = numRecords;
 		}
 	}
 }

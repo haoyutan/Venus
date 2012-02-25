@@ -144,9 +144,11 @@ public class SimJoinPlan extends Configured implements Tool {
 	
 	private void checkMandatoryArguments() {
 		checkClass(SimJoinConf.CK_ITEM_CLASS, ItemWritable.class);
-		checkClass(SimJoinConf.CK_HANDLER_ITEMBUILD_CLASS, ItemBuildHandler.class);
+		checkClass(SimJoinConf.CK_HANDLER_ITEMBUILD_CLASS,
+				ItemBuildHandler.class);
 		checkValue(SimJoinConf.CK_HAS_SIG);
-		checkClass(SimJoinConf.CK_HANDLER_ITEMPARTITION_CLASS, ItemPartitionHandler.class);
+		checkClass(SimJoinConf.CK_HANDLER_ITEMPARTITION_CLASS,
+				ItemPartitionHandler.class);
 	}
 	
 	private void checkClass(String confKey, Class<?> superClass) {
@@ -168,15 +170,17 @@ public class SimJoinPlan extends Configured implements Tool {
 	
 	private void setDefaultValues() {
 		setIfNotSpecified(SimJoinConf.CK_ALGO, SimJoinConf.CV_ALGO_AUTO);
+		setIfNotSpecified(SimJoinConf.CK_CLUSTER_TASK_SLOTS, "48");
 	}
 	
 	private void setIfNotSpecified(String confKey, String defaultValue) {
 		Configuration conf = getConf();
 		String value = conf.get(confKey, null);
 		if (value == null) {
-			LOG.info("  " + confKey + " is not specified. Use the default value.");
 			conf.set(confKey, defaultValue);
-		}
-		LOG.info("  " + confKey + ": " + conf.get(confKey, null));
+			LOG.info("  " + confKey + ": " + conf.get(confKey, null)
+					+ " (default)");
+		} else
+			LOG.info("  " + confKey + ": " + conf.get(confKey, null));
 	}
 }

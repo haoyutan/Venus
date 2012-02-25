@@ -8,6 +8,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.util.Tool;
 
 import simjoin.core.exec.PartitionItems;
+import simjoin.core.exec.SchedulePartitionPairs;
 import simjoin.core.exec.SimJoinPlan;
 
 public class SimJoin extends Configured implements Tool {
@@ -27,6 +28,7 @@ public class SimJoin extends Configured implements Tool {
 		Configuration conf = new Configuration(getConf());
 		workDir = SimJoinConf.getWorkDir(conf);
 		
+		// Stage 00
 		LOG.info("Stage-00-SimJoinPlan: Start...");
 		SimJoinConf.setWorkDir(conf, new Path(workDir, "Stage-00-SimJoinPlan"));
 		SimJoinPlan simJoinPlan = new SimJoinPlan(conf);
@@ -36,7 +38,7 @@ public class SimJoin extends Configured implements Tool {
 		Configuration plan = simJoinPlan.getPlan();
 		
 		// plan
-		String algorithm = conf.get(SimJoinPlan.CK_PLAN_ALGO);
+		String algorithm = plan.get(SimJoinPlan.CK_PLAN_ALGO);
 		if (SimJoinConf.CV_ALGO_CLONE.equals(algorithm))
 			doCloneJoin(plan, args);
 		else if (SimJoinConf.CV_ALGO_SHADOW.equals(algorithm))
@@ -52,19 +54,31 @@ public class SimJoin extends Configured implements Tool {
 	private int doCloneJoin(Configuration plan, String[] args) throws Exception {
 		int ret = -1;
 		final String ALGONAME = "CloneJoin";
-		String stageName;
 		Configuration conf;
 		
 		// Stage 01
-		stageName = "Stage-01-" + ALGONAME + "-PartitionItems";
+		String stage01Name = "Stage-01-" + ALGONAME + "-PartitionItems";
 		conf = new Configuration(plan);
 		conf.setBoolean(PartitionItems.CK_OUTPUT_PAYLOAD, true);
-		LOG.info(stageName + ": Start...");
-		SimJoinConf.setWorkDir(conf, new Path(workDir, stageName));
+		SimJoinConf.setWorkDir(conf, new Path(workDir, stage01Name));
+
+		LOG.info(stage01Name + ": Start...");
 		PartitionItems partitionItems = new PartitionItems(conf);
 		ret = partitionItems.run(null);
-		LOG.info(stageName + ": Finished with success.");
+		LOG.info(stage01Name + ": Finished with success.");
 		
+		// Stage 02
+		String stage02Name = "Stage-02-" + ALGONAME + "-SchedulePartitionPairs";
+		conf = new Configuration(plan);
+		SimJoinConf.setPath(conf, SchedulePartitionPairs.CK_PARTITIONS_DIR,
+				new Path(workDir, stage01Name));
+		SimJoinConf.setWorkDir(conf, new Path(workDir, stage02Name));
+		
+		LOG.info(stage02Name + ": Start...");
+		SchedulePartitionPairs schedulePartitionPairs = new SchedulePartitionPairs(
+				conf);
+		ret = schedulePartitionPairs.run(null);
+		LOG.info(stage02Name + ": Finished with success.");
 		return ret;
 	}
 	

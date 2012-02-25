@@ -30,6 +30,8 @@ public class SimJoinConf extends Configuration {
 	public static final String CK_HAS_SIG = "simjoin.core.has_signature";
 
 	public static final String CK_HANDLER_ITEMPARTITION_CLASS = "simjoin.core.handler.itempartition.class";
+	
+	public static final String CK_CLUSTER_TASK_SLOTS = "simjoin.core.cluster.task.slots";
 
 	public SimJoinConf() {
 		super(new Configuration());
@@ -37,6 +39,27 @@ public class SimJoinConf extends Configuration {
 
 	public SimJoinConf(Configuration conf) {
 		super(conf);
+	}
+	
+	// SequenceFile split should be larger than io.seqfile.compress.blocksize
+	public static long getSequenceFileCompressionBlockSize(Configuration conf) {
+		return conf.getInt("io.seqfile.compress.blocksize", Integer.MAX_VALUE);
+	}
+	
+	public long getSequenceFileCompressionBlockSize() {
+		return getSequenceFileCompressionBlockSize(this);
+	}
+	
+	// setPath
+	public static void setPath(Configuration conf, String key, Path path)
+			throws IOException {
+		path = path.getFileSystem(conf).makeQualified(path);
+		String dirStr = StringUtils.escapeString(path.toString());
+		conf.set(key, dirStr);
+	}
+	
+	public void setPath(String key, Path path) throws IOException {
+		setPath(this, key, path);
 	}
 
 	// CK_NAME
@@ -59,9 +82,7 @@ public class SimJoinConf extends Configuration {
 	// CK_WORKDIR
 	public static void setWorkDir(Configuration conf, Path workDir)
 			throws IOException {
-		workDir = workDir.getFileSystem(conf).makeQualified(workDir);
-		String dirStr = StringUtils.escapeString(workDir.toString());
-		conf.set(CK_WORKDIR, dirStr);
+		setPath(conf, CK_WORKDIR, workDir);
 	}
 
 	public void setWorkDir(Path workDir) throws IOException {
@@ -202,5 +223,22 @@ public class SimJoinConf extends Configuration {
 	@SuppressWarnings("rawtypes")
 	public Class<? extends ItemPartitionHandler> getItemPartitionHandlerClass() {
 		return getItemPartitionHandlerClass(this);
+	}
+	
+	// CK_CLUSTER_TASK_SLOTS
+	public static void setClusterTaskSlots(Configuration conf, int numSlots) {
+		conf.setInt(CK_CLUSTER_TASK_SLOTS, numSlots);
+	}
+	
+	public void setClusterTaskSlots(int numSlots) {
+		setClusterTaskSlots(this, numSlots);
+	}
+	
+	public static int getClusterTaskSlots(Configuration conf) {
+		return conf.getInt(CK_CLUSTER_TASK_SLOTS, -1);
+	}
+	
+	public int getClusterTaskSlots() {
+		return getClusterTaskSlots(this);
 	}
 }

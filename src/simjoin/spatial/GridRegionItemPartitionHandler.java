@@ -1,6 +1,7 @@
 package simjoin.spatial;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.hadoop.conf.Configuration;
@@ -36,5 +37,21 @@ public class GridRegionItemPartitionHandler extends
 	public List<Integer> getPartitions(ItemWritable item) {
 		RegionItemWritable regionItem = (RegionItemWritable) item;
 		return gridIndex.getPartitions(regionItem.getSignature());
+	}
+
+	@Override
+	public List<PartitionIdPair> getPartitionIdPairs() {
+		List<PartitionIdPair> pairs = new ArrayList<PartitionIdPair>();
+		int numStrips = gridIndex.getNumStrips();
+		for (int i = 0; i < numStrips ; i++)
+			for (int j = 0; j < numStrips; j++) {
+				int id = numStrips * j + i;
+				pairs.add(new PartitionIdPair(id, id));
+				if (i < numStrips - 1)
+					pairs.add(new PartitionIdPair(id, id + 1));
+				if (j < numStrips - 1)
+					pairs.add(new PartitionIdPair(id, id + numStrips));
+			}
+		return pairs;
 	}
 }

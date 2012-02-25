@@ -132,7 +132,7 @@ public class GridPartitionIndex extends Configured implements Tool {
 		protected void cleanup(Context context)
 				throws IOException, InterruptedException {
 			Configuration conf = context.getConfiguration();
-			int numStrips = conf.getInt("simjoin.spatial.gridindex.num_strips", 10);
+			int numStrips = conf.getInt("simjoin.spatial.gridindex.num_strips", 3);
 			
 			double width = xMax - xMin;
 			double height = yMax - yMin;
@@ -174,6 +174,10 @@ public class GridPartitionIndex extends Configured implements Tool {
 			height = yMax - yMin;
 		}
 		
+		// Example: (numStrips = 3)
+		// 6, 7, 8
+		// 3, 4, 5
+		// 0, 1, 2
 		public List<Integer> getPartitions(MbrWritable mbr) {
 			double x1 = mbr.getxMin();
 			double x2 = mbr.getxMax();
@@ -191,6 +195,26 @@ public class GridPartitionIndex extends Configured implements Tool {
 					pids.add(j * numStrips + i);
 			
 			return pids;
+		}
+
+		public int getNumStrips() {
+			return numStrips;
+		}
+
+		public double getxMin() {
+			return xMin;
+		}
+
+		public double getxMax() {
+			return xMax;
+		}
+
+		public double getyMin() {
+			return yMin;
+		}
+
+		public double getyMax() {
+			return yMax;
 		}
 	}
 	
