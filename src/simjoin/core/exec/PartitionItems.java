@@ -1,12 +1,6 @@
 package simjoin.core.exec;
 
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.OutputStreamWriter;
-import java.io.PrintWriter;
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -19,11 +13,10 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.PathFilter;
-import org.apache.hadoop.io.IntWritable;
+import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.io.SequenceFile;
 import org.apache.hadoop.io.SequenceFile.CompressionType;
-import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.compress.SnappyCodec;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Mapper;
@@ -38,6 +31,9 @@ import simjoin.core.SimJoinConf;
 import simjoin.core.SimJoinUtils;
 import simjoin.core.handler.ItemBuildHandler;
 import simjoin.core.handler.ItemPartitionHandler;
+import simjoin.core.partition.PartitionID;
+import simjoin.core.partition.VirtualPartitionID;
+import simjoin.core.partition.VirtualPartitionInfo;
 
 public class PartitionItems extends Configured implements Tool {
 	
@@ -59,7 +55,7 @@ public class PartitionItems extends Configured implements Tool {
 		job.setJarByClass(getClass());
 		
 		job.setMapperClass(PartitionItemsMapper.class);
-		job.setMapOutputKeyClass(IntWritable.class);
+		job.setMapOutputKeyClass(PartitionID.class);
 		job.setMapOutputValueClass(itemClass);
 		
 		job.setReducerClass(PartitionItemsReducer.class);
@@ -67,15 +63,18 @@ public class PartitionItems extends Configured implements Tool {
 		job.setOutputKeyClass(itemClass);
 		job.setOutputValueClass(NullWritable.class);
 		SequenceFileOutputFormat.setCompressOutput(job, true);
-		SequenceFileOutputFormat.setOutputCompressionType(job, CompressionType.BLOCK);
-		SequenceFileOutputFormat.setOutputCompressorClass(job, SnappyCodec.class);
-		MultipleOutputs.addNamedOutput(job, "metadata", SequenceFileOutputFormat.class,
-				Text.class, NullWritable.class);
+		SequenceFileOutputFormat.setOutputCompressionType(job,
+				CompressionType.BLOCK);
+		SequenceFileOutputFormat.setOutputCompressorClass(job,
+				SnappyCodec.class);
+		MultipleOutputs.addNamedOutput(job, "StatNumRecords",
+				SequenceFileOutputFormat.class, PartitionID.class,
+				LongWritable.class);
 	}
 	
 	@SuppressWarnings("rawtypes")
 	public static class PartitionItemsMapper<KEYIN, VALUEIN> extends
-			Mapper<KEYIN, VALUEIN, IntWritable, ItemWritable> {
+			Mapper<KEYIN, VALUEIN, PartitionID, ItemWritable> {
 
 		private boolean hasSignature;
 
@@ -122,9 +121,9 @@ public class PartitionItems extends Configured implements Tool {
 			itemBuildHandler.resetItem(item, key, value);
 			item.setMask(mask);
 			
-			List<Integer> pids = itemPartitionHandler.getPartitions(item);
-			for (Integer pid : pids)
-				context.write(new IntWritable(pid), item);
+			List<PartitionID> pids = itemPartitionHandler.getPartitions(item);
+			for (PartitionID pid : pids)
+				context.write(pid, item);
 		}
 
 		@Override
@@ -139,7 +138,7 @@ public class PartitionItems extends Configured implements Tool {
 	
 	@SuppressWarnings("rawtypes")
 	public static class PartitionItemsReducer<VALUEIN extends ItemWritable, VALUEOUT extends ItemWritable>
-			extends Reducer<IntWritable, VALUEIN, VALUEOUT, NullWritable> {
+			extends Reducer<PartitionID, VALUEIN, VALUEOUT, NullWritable> {
 		
 		MultipleOutputs mos;
 
@@ -153,16 +152,15 @@ public class PartitionItems extends Configured implements Tool {
 
 		@SuppressWarnings("unchecked")
 		@Override
-		protected void reduce(IntWritable key, Iterable<VALUEIN> values,
+		protected void reduce(PartitionID key, Iterable<VALUEIN> values,
 				Context context) throws IOException, InterruptedException {
-			String partitionName = getPartitionName(key.get());
+			String partitionName = PARTITION__FILENAME_PREFIX + key.toString();
 			long count = 0;
 			for (VALUEIN value : values) {
 				mos.write(value, NullWritable.get(), partitionName);
 				++count;
 			}
-			String metadataString = "" + key.get() + "," + count;
-			mos.write("metadata", new Text(metadataString), NullWritable.get());
+			mos.write("StatNumRecords", key, new LongWritable(count));
 		}
 
 		@Override
@@ -222,55 +220,43 @@ public class PartitionItems extends Configured implements Tool {
 		Configuration conf = getConf();
 		FileSystem fs = workDir.getFileSystem(conf);
 
-		// get name and size of each partition file
-		Map<Integer, Long> partitionFilesizes = new HashMap<Integer, Long>();
-		Map<Integer, String> partitionFilenames = new HashMap<Integer, String>();
+		Map<VirtualPartitionID, VirtualPartitionInfo> vpInfoMap = 
+				new HashMap<VirtualPartitionID, VirtualPartitionInfo>();
+		
+		// get path and size of each partition file
 		FileStatus[] partitionFileStatus = fs.listStatus(workDir,
 				new PrefixPathFilter(PARTITION__FILENAME_PREFIX));
+		int prefixLength = PARTITION__FILENAME_PREFIX.length();
 		for (FileStatus status : partitionFileStatus) {
 			String filename = status.getPath().getName();
-			int partitionId = getPartitionId(filename);
-			partitionFilesizes.put(partitionId, status.getLen());
-			partitionFilenames.put(partitionId, filename);
+			VirtualPartitionID vpId = VirtualPartitionID
+					.createFromString(filename.substring(prefixLength));
+			VirtualPartitionInfo vpInfo = new VirtualPartitionInfo(vpId);
+			vpInfo.setLength(status.getLen());
+			vpInfo.setPartitionFile(new Path(status.getPath().getName()));
+			vpInfoMap.put(vpId, vpInfo);
 		}
-		LOG.info("  Name and size loaded.");
+		LOG.info("  Partition file path and size loaded.");
 
 		// get the number of records in each partition
-		Map<Integer, Long> partitionNumRecords = new HashMap<Integer, Long>();
 		FileStatus[] metaFileStatus = fs.listStatus(workDir,
-				new PrefixPathFilter("metadata-"));
+				new PrefixPathFilter("StatNumRecords-"));
 		for (FileStatus status : metaFileStatus) {
 			SequenceFile.Reader reader = new SequenceFile.Reader(fs,
 					status.getPath(), conf);
-			Text line = new Text();
-			while (reader.next(line)) {
-				String[] fields = line.toString().split(",");
-				int partitionId = Integer.parseInt(fields[0]);
-				long numRecords = Long.parseLong(fields[1]);
-				partitionNumRecords.put(partitionId, numRecords);
-			}
+			PartitionID key = new PartitionID();
+			LongWritable value = new LongWritable();
+			while (reader.next(key, value))
+				vpInfoMap.get(key).setNumRecords(value.get());
 			reader.close();
 		}
 		LOG.info("  Number of records loaded.");
 		
-		// output summary file
-		PrintWriter writer = new PrintWriter(new OutputStreamWriter(fs.create(
-				new Path(workDir, FILENAME_SUMMARY), true)));
-		writer.println("id,filename,filesize,numRecords");
-		List<Integer> partitionIdList = new ArrayList<Integer>(
-				partitionNumRecords.keySet());
-		Collections.sort(partitionIdList);
-		for (int partitionId : partitionIdList) {
-			String filename = partitionFilenames.get(partitionId);
-			long filesize = partitionFilesizes.get(partitionId);
-			long numRecords = partitionNumRecords.get(partitionId);
-			writer.printf("%d,%s,%d,%d\n", partitionId, filename, filesize,
-					numRecords);
-		}
-		writer.close();
+		VirtualPartitionInfo.writeVirtualPartitionInfo(conf, new Path(workDir,
+				FILENAME_SUMMARY), vpInfoMap.values(), true);
 		LOG.info("  Summary file written.");
 		
-		// remove useless files (metadata-* and part-r-*)
+		// remove useless files (StatNumRecords-* and part-r-*)
 		for (FileStatus status : metaFileStatus)
 			fs.delete(status.getPath(), true);
 		FileStatus[] partFileStatus = fs.listStatus(workDir,
@@ -280,14 +266,6 @@ public class PartitionItems extends Configured implements Tool {
 		LOG.info("  Useless files removed.");
 		
 		LOG.info("Creating summary file... Done.");
-	}
-
-	private static String getPartitionName(int partitionId) {
-		return String.format("%s%010d", PARTITION__FILENAME_PREFIX, partitionId);
-	}
-	
-	private static int getPartitionId(String partitionName) {
-		return Integer.parseInt(partitionName.substring(2, 12));
 	}
 	
 	private static class PrefixPathFilter implements PathFilter {
@@ -301,70 +279,6 @@ public class PartitionItems extends Configured implements Tool {
 		@Override
 		public boolean accept(Path path) {
 			return path.getName().startsWith(prefix);
-		}
-	}
-	
-	public static Map<Integer, PartitionInfo> getPartitionInfo(
-			Configuration conf, Path path) throws IOException {
-		FileSystem fs = path.getFileSystem(conf);
-		FileStatus status = fs.getFileStatus(path);
-		if (status.isDir())
-			path = new Path(path, FILENAME_SUMMARY);
-		Path partitionsDir = path.getParent();
-		
-		BufferedReader reader = new BufferedReader(new InputStreamReader(
-				fs.open(path)));
-		String line = reader.readLine(); // consume csv header
-		Map<Integer, PartitionInfo> infoMap = new HashMap<Integer, PartitionInfo>();
-		while ((line = reader.readLine()) != null) {
-			String[] fields = line.split(",");
-			PartitionInfo info = new PartitionInfo();
-			info.setId(Integer.parseInt(fields[0]));
-			info.setPath(new Path(partitionsDir, fields[1]));
-			info.setSize(Long.parseLong(fields[2]));
-			info.setNumRecords(Long.parseLong(fields[3]));
-			infoMap.put(info.getId(), info);
-		}
-		reader.close();
-		return infoMap;
-	}
-	
-	public static class PartitionInfo {
-		private int id;
-		private Path path;
-		private long size;
-		private long numRecords;
-		
-		public int getId() {
-			return id;
-		}
-		
-		public void setId(int id) {
-			this.id = id;
-		}
-		
-		public Path getPath() {
-			return path;
-		}
-		
-		public void setPath(Path path) {
-			this.path = path;
-		}
-		
-		public long getSize() {
-			return size;
-		}
-		
-		public void setSize(long size) {
-			this.size = size;
-		}
-		
-		public long getNumRecords() {
-			return numRecords;
-		}
-		
-		public void setNumRecords(long numRecords) {
-			this.numRecords = numRecords;
 		}
 	}
 }

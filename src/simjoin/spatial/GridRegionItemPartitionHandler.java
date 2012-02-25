@@ -9,6 +9,8 @@ import org.apache.hadoop.fs.Path;
 
 import simjoin.core.ItemWritable;
 import simjoin.core.handler.ItemPartitionHandler;
+import simjoin.core.partition.IDPair;
+import simjoin.core.partition.PartitionID;
 import simjoin.spatial.GridPartitionIndex.GridIndex;
 
 public class GridRegionItemPartitionHandler extends
@@ -34,24 +36,30 @@ public class GridRegionItemPartitionHandler extends
 
 	@SuppressWarnings("rawtypes")
 	@Override
-	public List<Integer> getPartitions(ItemWritable item) {
+	public List<PartitionID> getPartitions(ItemWritable item) {
 		RegionItemWritable regionItem = (RegionItemWritable) item;
 		return gridIndex.getPartitions(regionItem.getSignature());
 	}
 
 	@Override
-	public List<PartitionIdPair> getPartitionIdPairs() {
-		List<PartitionIdPair> pairs = new ArrayList<PartitionIdPair>();
+	public List<IDPair<PartitionID>> getPartitionIdPairs() {
+		List<IDPair<PartitionID>> pairs = new ArrayList<IDPair<PartitionID>>();
 		int numStrips = gridIndex.getNumStrips();
 		for (int i = 0; i < numStrips ; i++)
 			for (int j = 0; j < numStrips; j++) {
 				int id = numStrips * j + i;
-				pairs.add(new PartitionIdPair(id, id));
+				addIDPair(pairs, id, id);
 				if (i < numStrips - 1)
-					pairs.add(new PartitionIdPair(id, id + 1));
+					addIDPair(pairs, id, id + 1);
 				if (j < numStrips - 1)
-					pairs.add(new PartitionIdPair(id, id + numStrips));
+					addIDPair(pairs, id, id + numStrips);
 			}
 		return pairs;
+	}
+	
+	private void addIDPair(List<IDPair<PartitionID>> pairs, long id1, long id2) {
+		PartitionID pid1 = new PartitionID(id1);
+		PartitionID pid2 = new PartitionID(id2);
+		pairs.add(new IDPair<PartitionID>(pid1, pid2));
 	}
 }

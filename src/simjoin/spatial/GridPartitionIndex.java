@@ -28,6 +28,7 @@ import org.apache.hadoop.util.ToolRunner;
 import simjoin.core.SimJoinConf;
 import simjoin.core.SimJoinUtils;
 import simjoin.core.handler.ItemBuildHandler;
+import simjoin.core.partition.PartitionID;
 
 public class GridPartitionIndex extends Configured implements Tool {
 	
@@ -178,7 +179,7 @@ public class GridPartitionIndex extends Configured implements Tool {
 		// 6, 7, 8
 		// 3, 4, 5
 		// 0, 1, 2
-		public List<Integer> getPartitions(MbrWritable mbr) {
+		public List<PartitionID> getPartitions(MbrWritable mbr) {
 			double x1 = mbr.getxMin();
 			double x2 = mbr.getxMax();
 			double y1 = mbr.getyMin();
@@ -189,10 +190,10 @@ public class GridPartitionIndex extends Configured implements Tool {
 			int bottom = (int) ((y1 - yMin) * numStrips / height);
 			int top = (int) ((y2 - yMin) * numStrips / height);
 			
-			ArrayList<Integer> pids = new ArrayList<Integer>();
+			ArrayList<PartitionID> pids = new ArrayList<PartitionID>();
 			for (int i = left; i <= right; i++)
 				for (int j = bottom; j <= top; j++)
-					pids.add(j * numStrips + i);
+					pids.add(new PartitionID(j * numStrips + i));
 			
 			return pids;
 		}
