@@ -9,6 +9,8 @@ import org.apache.hadoop.io.WritableComparator;
 
 public class VirtualPartitionID implements WritableComparable<VirtualPartitionID> {
 	
+	public static final long PHYSICAL_PARTITION_SUBID = Long.MAX_VALUE;
+	
 	public static VirtualPartitionID createFromString(String idStr) {
 		long mainId = Long.parseLong(idStr.substring(0, 16), 16);
 		long subId = Long.parseLong(idStr.substring(17, 33), 16);
@@ -20,11 +22,11 @@ public class VirtualPartitionID implements WritableComparable<VirtualPartitionID
 	private long subId;
 	
 	public VirtualPartitionID() {
-		this(-1, -1);
+		this(-1, PHYSICAL_PARTITION_SUBID);
 	}
 	
 	public VirtualPartitionID(long mainId) {
-		this(mainId, -1);
+		this(mainId, PHYSICAL_PARTITION_SUBID);
 	}
 	
 	public VirtualPartitionID(long mainId, long subId) {
@@ -46,6 +48,10 @@ public class VirtualPartitionID implements WritableComparable<VirtualPartitionID
 
 	public void setSubId(long subId) {
 		this.subId = subId;
+	}
+	
+	public boolean isPhysicalPartition() {
+		return this.subId == PHYSICAL_PARTITION_SUBID;
 	}
 
 	@Override

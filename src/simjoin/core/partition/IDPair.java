@@ -2,6 +2,11 @@ package simjoin.core.partition;
 
 public class IDPair<T extends VirtualPartitionID> {
 
+	public static <T extends VirtualPartitionID> IDPair<T> makePair(T first,
+			T second) {
+		return new IDPair<T>(first, second);
+	}
+	
 	private T first, second;
 	
 	public IDPair(T first, T second) {

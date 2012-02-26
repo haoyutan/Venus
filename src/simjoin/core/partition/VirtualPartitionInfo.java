@@ -5,8 +5,10 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.List;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
@@ -85,6 +87,41 @@ public class VirtualPartitionInfo {
 	public String toString() {
 		return id.toString() + "," + partitionFile + "," + start + "," + length
 				+ "," + numRecords;
+	}
+	
+	public boolean isSplitable() {
+		return id.isPhysicalPartition();
+	}
+	
+	public List<VirtualPartitionInfo> getSplits(int numSplits) {
+		return getSplits(numSplits, 2000000, 1.1);
+	}
+
+	public List<VirtualPartitionInfo> getSplits(int numSplits, long minSplitSize,
+			double splitSlop) {
+		if (!isSplitable() || start != 0 || length < 0)
+			throw new IllegalArgumentException("This virtual partition is unsplitable.");
+		if (numSplits <= 0)
+			throw new IllegalArgumentException("numSplits must be positive.");
+		
+		List<VirtualPartitionInfo> splitInfoList = new ArrayList<VirtualPartitionInfo>();
+		long splitSize = (long) Math.max(minSplitSize, Math.ceil(length / numSplits));
+		long bytesRemaining = length;
+		long mainId = id.getMainId();
+		long nextSubId = 0;
+		while (((double) bytesRemaining) / splitSize > splitSlop) {
+			splitInfoList.add(new VirtualPartitionInfo(new VirtualPartitionID(
+					mainId, nextSubId), partitionFile, length - bytesRemaining,
+					splitSize, numRecords * splitSize / length));
+			bytesRemaining -= splitSize;
+			++nextSubId;
+		}
+		if (bytesRemaining != 0)
+			splitInfoList.add(new VirtualPartitionInfo(new VirtualPartitionID(
+					mainId, nextSubId), partitionFile, length - bytesRemaining,
+					bytesRemaining, numRecords * bytesRemaining / length));
+
+		return splitInfoList;
 	}
 
 	public static void writeVirtualPartitionInfo(Configuration conf, Path file,
