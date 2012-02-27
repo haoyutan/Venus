@@ -9,12 +9,17 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 
 public class VirtualPartitionInfo {
+	
+	public static final String FILENAME_SUMMARY = "_partition_summary.csv";
+	
+	public static final String TASK_FILENAME_PREFIX = "T-";
 
 	private VirtualPartitionID id;
 	
@@ -124,12 +129,14 @@ public class VirtualPartitionInfo {
 		return splitInfoList;
 	}
 
-	public static void writeVirtualPartitionInfo(Configuration conf, Path file,
+	public static void writeVirtualPartitionInfo(Configuration conf, Path path,
 			Collection<VirtualPartitionInfo> vpInfoSet, boolean overwrite)
 			throws IOException {
-		FileSystem fs = file.getFileSystem(conf);
+		FileSystem fs = path.getFileSystem(conf);
+		if (fs.exists(path) && fs.getFileStatus(path).isDir())
+			path = new Path(path, FILENAME_SUMMARY);
 		PrintWriter writer = new PrintWriter(new OutputStreamWriter(fs.create(
-				file, overwrite)));
+				path, overwrite)));
 		writer.println("id,file,start,length,numRecords");
 		for (VirtualPartitionInfo vpInfo : vpInfoSet)
 			writer.printf("%s,%s,%d,%d,%d\n", vpInfo.getId(),
@@ -138,14 +145,16 @@ public class VirtualPartitionInfo {
 		writer.close();
 	}
 
-	public static HashMap<VirtualPartitionID, VirtualPartitionInfo> readVirtualPartitionInfo(
-			Configuration conf, Path file, boolean forceAbsolutePath)
+	public static Map<VirtualPartitionID, VirtualPartitionInfo> readVirtualPartitionInfo(
+			Configuration conf, Path path, boolean forceAbsolutePath)
 			throws IOException {
 		HashMap<VirtualPartitionID, VirtualPartitionInfo> map = 
 				new HashMap<VirtualPartitionID, VirtualPartitionInfo>();
-		FileSystem fs = file.getFileSystem(conf);
+		FileSystem fs = path.getFileSystem(conf);
+		if (fs.getFileStatus(path).isDir())
+			path = new Path(path, FILENAME_SUMMARY);
 		BufferedReader reader = new BufferedReader(new InputStreamReader(
-				fs.open(file)));
+				fs.open(path)));
 		String line = reader.readLine(); // consume the header
 		while ((line = reader.readLine()) != null) {
 			String[] fields = line.split(",");
@@ -153,7 +162,7 @@ public class VirtualPartitionInfo {
 			VirtualPartitionInfo vpInfo = new VirtualPartitionInfo(vpId);
 			Path partitionFile = new Path(fields[1]);
 			if (forceAbsolutePath && !partitionFile.isAbsolute())
-				partitionFile = new Path(file.getParent(), partitionFile.getName());
+				partitionFile = new Path(path.getParent(), partitionFile.getName());
 			vpInfo.setPartitionFile(partitionFile);
 			vpInfo.setStart(Long.parseLong(fields[2]));
 			vpInfo.setLength(Long.parseLong(fields[3]));

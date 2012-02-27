@@ -27,10 +27,6 @@ public class SchedulePartitionPairs extends Configured implements Tool {
 	
 	private static final Log LOG = LogFactory.getLog(SchedulePartitionPairs.class);
 	
-	public static final String FILENAME_SUMMARY = "_partition_summary.csv";
-	
-	public static final String TASK_FILENAME_PREFIX = "T-";
-	
 	public static final String CK_PARTITIONS_DIR = "simjoin.core.exec.partitions_dir"; 
 	
 	private Path workDir;
@@ -82,15 +78,14 @@ public class SchedulePartitionPairs extends Configured implements Tool {
 		assignTasks();
 		writeVirtualPartitionInfo();
 		writeTaskInputFiles();
-		return 1;
+		return 0;
 	}
 	
 	private void readOriginalParititionInfo() throws IOException {
 		Configuration conf = getConf();
 		partitionsDir = new Path(conf.get(CK_PARTITIONS_DIR));
-		summaryFile = new Path(partitionsDir, PartitionItems.FILENAME_SUMMARY);
 		origVpInfoMap = VirtualPartitionInfo.readVirtualPartitionInfo(conf,
-				summaryFile, true);
+				partitionsDir, true);
 		LOG.info("Partitions info loaded from " + summaryFile + " ("
 				+ origVpInfoMap.size() + " partitions).");
 	}
@@ -248,22 +243,18 @@ public class SchedulePartitionPairs extends Configured implements Tool {
 	}
 	
 	private void writeVirtualPartitionInfo() throws IOException {
-		Path summaryFile = new Path(workDir, FILENAME_SUMMARY);
-		VirtualPartitionInfo.writeVirtualPartitionInfo(getConf(), summaryFile,
+		VirtualPartitionInfo.writeVirtualPartitionInfo(getConf(), workDir,
 				splitVpInfoMap.values(), true);
-		LOG.info("Virtual partition info written to " + summaryFile + ".");
+		LOG.info("Virtual partition info written to "
+				+ new Path(workDir, VirtualPartitionInfo.FILENAME_SUMMARY)
+				+ ".");
 	}
 	
 	private void writeTaskInputFiles() throws IOException {
-		for (int i = 0; i < tasks.length; i++) {
-			String taskInputFilename = String.format("%s%05d",
-					TASK_FILENAME_PREFIX, i);
-			PrintWriter writer = createFileWriter(new Path(workDir,
-					taskInputFilename));
-			for (IDPair<VirtualPartitionID> pair : tasks[i].getInnerList())
-				writer.println(pair);
-			writer.close();
-		}
+		for (int i = 0; i < tasks.length; i++)
+			IDPairList.writeIDPairList(getConf(),
+					new Path(workDir, String.format("%s%05d", "T-", i)),
+					tasks[i], true);
 		LOG.info("Task input files created.");
 	}
 	

@@ -7,6 +7,13 @@ public class IDPair<T extends VirtualPartitionID> {
 		return new IDPair<T>(first, second);
 	}
 	
+	public static IDPair<VirtualPartitionID> createFromString(String pairStr) {
+		String[] fields = pairStr.split(",");
+		VirtualPartitionID first = VirtualPartitionID.createFromString(fields[0]);
+		VirtualPartitionID second = VirtualPartitionID.createFromString(fields[1]);
+		return makePair(first, second);
+	}
+	
 	private T first, second;
 	
 	public IDPair(T first, T second) {

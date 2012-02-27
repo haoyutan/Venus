@@ -133,7 +133,7 @@ public class GridPartitionIndex extends Configured implements Tool {
 		protected void cleanup(Context context)
 				throws IOException, InterruptedException {
 			Configuration conf = context.getConfiguration();
-			int numStrips = conf.getInt("simjoin.spatial.gridindex.num_strips", 20);
+			int numStrips = conf.getInt("simjoin.spatial.gridindex.num_strips", 3);
 			
 			double width = xMax - xMin;
 			double height = yMax - yMin;

@@ -8,6 +8,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.util.Tool;
 
 import simjoin.core.exec.PartitionItems;
+import simjoin.core.exec.PartitionJoin;
 import simjoin.core.exec.SchedulePartitionPairs;
 import simjoin.core.exec.SimJoinPlan;
 
@@ -40,9 +41,9 @@ public class SimJoin extends Configured implements Tool {
 		// plan
 		String algorithm = plan.get(SimJoinPlan.CK_PLAN_ALGO);
 		if (SimJoinConf.CV_ALGO_CLONE.equals(algorithm))
-			doCloneJoin(plan, args);
+			ret = doCloneJoin(plan, args);
 		else if (SimJoinConf.CV_ALGO_SHADOW.equals(algorithm))
-			doShadowJoin(plan, args);
+			ret = doShadowJoin(plan, args);
 		else {
 			LOG.error("Does not support planned algorithm: " + algorithm);
 			ret = -1;
@@ -66,6 +67,8 @@ public class SimJoin extends Configured implements Tool {
 		PartitionItems partitionItems = new PartitionItems(conf);
 		ret = partitionItems.run(null);
 		LOG.info(stage01Name + ": Finished with success.");
+		if (ret != 0)
+			return ret;
 		
 		// Stage 02
 		String stage02Name = "Stage-02-" + ALGONAME + "-SchedulePartitionPairs";
@@ -79,6 +82,23 @@ public class SimJoin extends Configured implements Tool {
 				conf);
 		ret = schedulePartitionPairs.run(null);
 		LOG.info(stage02Name + ": Finished with success.");
+		if (ret != 0)
+			return ret;
+		
+		// Stage 03
+		String stage03Name = "Stage-03-" + ALGONAME + "-PartitionJoin";
+		conf = new Configuration(plan);
+		SimJoinConf.setPath(conf, PartitionJoin.CK_TASKSCHEDULE_DIR,
+				new Path(workDir, stage02Name));
+		SimJoinConf.setWorkDir(conf, new Path(workDir, stage03Name));
+		
+		LOG.info(stage03Name + ": Start...");
+		PartitionJoin partitionJoin = new PartitionJoin(conf);
+		ret = partitionJoin.run(null);
+		LOG.info(stage02Name + ": Finished with success.");
+		if (ret != 0)
+			return ret;
+		
 		return ret;
 	}
 	

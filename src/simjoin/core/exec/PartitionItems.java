@@ -43,8 +43,6 @@ public class PartitionItems extends Configured implements Tool {
 	
 	private static final String PARTITION__FILENAME_PREFIX = "P-";
 	
-	public static final String FILENAME_SUMMARY = "_partition_summary.csv";
-	
 	@SuppressWarnings({ "rawtypes" })
 	private void configureJob(Job job) {
 		Configuration conf = job.getConfiguration();
@@ -251,9 +249,9 @@ public class PartitionItems extends Configured implements Tool {
 			reader.close();
 		}
 		LOG.info("  Number of records loaded.");
-		
-		VirtualPartitionInfo.writeVirtualPartitionInfo(conf, new Path(workDir,
-				FILENAME_SUMMARY), vpInfoMap.values(), true);
+
+		VirtualPartitionInfo.writeVirtualPartitionInfo(conf, workDir,
+				vpInfoMap.values(), true);
 		LOG.info("  Summary file written.");
 		
 		// remove useless files (StatNumRecords-* and part-r-*)
