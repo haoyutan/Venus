@@ -4,6 +4,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.util.ReflectionUtils;
 
 import simjoin.core.handler.ItemBuildHandler;
+import simjoin.core.handler.ItemJoinHandler;
 import simjoin.core.handler.ItemPartitionHandler;
 
 public class SimJoinUtils {
@@ -20,7 +21,14 @@ public class SimJoinUtils {
 		Class<?> handlerClass = SimJoinConf.getItemPartitionHandlerClass(conf);
 		return (ItemPartitionHandler) createInstance(handlerClass, conf);
 	}
-
+	
+	@SuppressWarnings("rawtypes")
+	public static ItemJoinHandler createItemJoinHandler(
+			Configuration conf) {
+		Class<?> handlerClass = SimJoinConf.getItemJoinHandlerClass(conf);
+		return (ItemJoinHandler) createInstance(handlerClass, conf);
+	}
+	
 	private static Object createInstance(Class<?> theClass, Configuration conf) {
 		Object instance;
 		try {

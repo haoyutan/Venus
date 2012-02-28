@@ -8,12 +8,10 @@ import simjoin.core.partition.PartitionID;
 
 @SuppressWarnings("rawtypes")
 public abstract class ItemPartitionHandler<ITEM extends ItemWritable> extends
-		SetupCleanupHandler {
-	
-	protected Class<ITEM> itemClass;
+		ItemSetupCleanupHandler<ITEM> {
 
 	public ItemPartitionHandler(Class<ITEM> itemClass) {
-		this.itemClass = itemClass;
+		super(itemClass);
 	}
 	
 	public abstract List<PartitionID> getPartitions(ItemWritable item);

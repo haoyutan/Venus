@@ -106,11 +106,11 @@ public class PartitionItems extends Configured implements Tool {
 				mask |= ItemWritable.MASK_SIG;
 			
 			itemBuildHandler = SimJoinUtils.createItemBuildHandler(conf);
-			itemBuildHandler.setup(conf);
+			itemBuildHandler.setup(context);
 			item = itemBuildHandler.createItem();
 			
 			itemPartitionHandler = SimJoinUtils.createItemPartitionHandler(conf);
-			itemPartitionHandler.setup(conf);
+			itemPartitionHandler.setup(context);
 		}
 
 		@Override
@@ -127,9 +127,8 @@ public class PartitionItems extends Configured implements Tool {
 		@Override
 		protected void cleanup(Context context)
 				throws IOException, InterruptedException {
-			Configuration conf = context.getConfiguration();
-			itemPartitionHandler.cleanup(conf);
-			itemBuildHandler.cleanup(conf);
+			itemPartitionHandler.cleanup(context);
+			itemBuildHandler.cleanup(context);
 			super.cleanup(context);
 		}
 	}

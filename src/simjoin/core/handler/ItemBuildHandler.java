@@ -4,12 +4,10 @@ import simjoin.core.ItemWritable;
 
 @SuppressWarnings("rawtypes")
 public abstract class ItemBuildHandler<KEYIN, VALUEIN, ITEM extends ItemWritable>
-		extends SetupCleanupHandler {
-	
-	protected Class<ITEM> itemClass;
+		extends ItemSetupCleanupHandler<ITEM> {
 
 	public ItemBuildHandler(Class<ITEM> itemClass) {
-		this.itemClass = itemClass;
+		super(itemClass);
 	}
 	
 	public ITEM createItem() {

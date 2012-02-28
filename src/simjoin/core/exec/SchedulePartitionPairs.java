@@ -113,8 +113,8 @@ public class SchedulePartitionPairs extends Configured implements Tool {
 	private void getSchedulingArguments() throws IOException {
 		Configuration conf = getConf();
 		numTasks = SimJoinConf.getClusterTaskSlots(conf) * 2;
-		minPartitionLength = SimJoinConf
-				.getSequenceFileCompressionBlockSize(conf) * 2;
+		minPartitionLength = Math.max(8000000,
+				SimJoinConf.getSequenceFileCompressionBlockSize(conf));
 		LOG.info("Arguments for scheduling: numTasks = " + numTasks
 				+ ", minPartitionLength = " + minPartitionLength);
 		

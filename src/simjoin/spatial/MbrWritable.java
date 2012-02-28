@@ -67,4 +67,15 @@ public class MbrWritable implements Writable {
 		pw.format("%f,%f,%f,%f", xMin, xMax, yMin, yMax);
 		return sw.toString();
 	}
+	
+	public boolean intersects(MbrWritable other) {
+		return (this.xMin < other.xMax && this.yMin < other.yMax
+				&& other.xMin < this.xMin && other.yMin < this.yMin);
+	}
+
+	// FIXME: for debug purpose only
+	@Override
+	public boolean equals(Object obj) {
+		return intersects((MbrWritable) obj);
+	}
 }

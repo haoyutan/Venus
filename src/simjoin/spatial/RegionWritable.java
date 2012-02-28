@@ -69,4 +69,11 @@ public class RegionWritable implements Writable {
 			pw.format(",(%f,%f)", x[i], y[i]);
 		return sw.toString();
 	}
+
+	// FIXME: for debug purpose only
+	@Override
+	public boolean equals(Object obj) {
+		RegionWritable other = (RegionWritable) obj;
+		return (this.getNumPoints() == other.getNumPoints());
+	}
 }

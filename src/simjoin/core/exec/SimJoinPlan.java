@@ -18,6 +18,7 @@ import simjoin.core.ItemWritable;
 import simjoin.core.SimJoinConf;
 import simjoin.core.handler.ItemBuildHandler;
 import simjoin.core.handler.ItemPartitionHandler;
+import simjoin.core.handler.NestedLoopItemJoinHandler;
 
 public class SimJoinPlan extends Configured implements Tool {
 	
@@ -170,7 +171,9 @@ public class SimJoinPlan extends Configured implements Tool {
 	
 	private void setDefaultValues() {
 		setIfNotSpecified(SimJoinConf.CK_ALGO, SimJoinConf.CV_ALGO_AUTO);
-		setIfNotSpecified(SimJoinConf.CK_CLUSTER_TASK_SLOTS, "48");
+		setIfNotSpecified(SimJoinConf.CK_CLUSTER_TASK_SLOTS, "2");
+		setIfNotSpecified(SimJoinConf.CK_HANDLER_ITEMJOIN_CLASS,
+				NestedLoopItemJoinHandler.class.getName());
 	}
 	
 	private void setIfNotSpecified(String confKey, String defaultValue) {

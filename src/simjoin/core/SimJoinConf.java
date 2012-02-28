@@ -8,6 +8,7 @@ import org.apache.hadoop.mapreduce.InputFormat;
 import org.apache.hadoop.util.StringUtils;
 
 import simjoin.core.handler.ItemBuildHandler;
+import simjoin.core.handler.ItemJoinHandler;
 import simjoin.core.handler.ItemPartitionHandler;
 
 public class SimJoinConf extends Configuration {
@@ -30,6 +31,8 @@ public class SimJoinConf extends Configuration {
 	public static final String CK_HAS_SIG = "simjoin.core.has_signature";
 
 	public static final String CK_HANDLER_ITEMPARTITION_CLASS = "simjoin.core.handler.itempartition.class";
+	
+	public static final String CK_HANDLER_ITEMJOIN_CLASS ="simjoin.core.handler.itemjoin.class";
 	
 	public static final String CK_CLUSTER_TASK_SLOTS = "simjoin.core.cluster.task.slots";
 
@@ -225,6 +228,32 @@ public class SimJoinConf extends Configuration {
 		return getItemPartitionHandlerClass(this);
 	}
 	
+	// CK_HANDLER_ITEMJOIN_CLASS
+	@SuppressWarnings("rawtypes")
+	public static void setItemJoinHandlerClass(Configuration conf,
+			Class<? extends ItemJoinHandler> handlerClass) {
+		conf.setClass(CK_HANDLER_ITEMJOIN_CLASS, handlerClass,
+				ItemJoinHandler.class);
+	}
+	
+	@SuppressWarnings("rawtypes")
+	public void setItemJoinHandlerClass(
+			Class<? extends ItemJoinHandler> handlerClass) {
+		setItemJoinHandlerClass(this, handlerClass);
+	}
+	
+	@SuppressWarnings({ "rawtypes", "unchecked" })
+	public static Class<? extends ItemJoinHandler> getItemJoinHandlerClass(
+			Configuration conf) {
+		return (Class<? extends ItemJoinHandler>) conf.getClass(
+				CK_HANDLER_ITEMJOIN_CLASS, ItemJoinHandler.class);
+	}
+	
+	@SuppressWarnings("rawtypes")
+	public Class<? extends ItemJoinHandler> getItemJoinHandlerClass() {
+		return getItemJoinHandlerClass(this);
+	}
+
 	// CK_CLUSTER_TASK_SLOTS
 	public static void setClusterTaskSlots(Configuration conf, int numSlots) {
 		conf.setInt(CK_CLUSTER_TASK_SLOTS, numSlots);

@@ -65,7 +65,7 @@ public class GridPartitionIndex extends Configured implements Tool {
 			super.setup(context);
 			Configuration conf = context.getConfiguration();
 			itemBuildHandler = SimJoinUtils.createItemBuildHandler(conf);
-			itemBuildHandler.setup(conf);
+			itemBuildHandler.setup(context);
 			regionItem = (RegionItemWritable) itemBuildHandler.createItem();
 			
 			xMin = Double.POSITIVE_INFINITY;
@@ -94,8 +94,7 @@ public class GridPartitionIndex extends Configured implements Tool {
 			context.write(new IntWritable(2), new DoubleWritable(yMin));
 			context.write(new IntWritable(3), new DoubleWritable(yMax));
 			
-			Configuration conf = context.getConfiguration();
-			itemBuildHandler.cleanup(conf);
+			itemBuildHandler.cleanup(context);
 			super.cleanup(context);
 		}
 	}
@@ -133,7 +132,7 @@ public class GridPartitionIndex extends Configured implements Tool {
 		protected void cleanup(Context context)
 				throws IOException, InterruptedException {
 			Configuration conf = context.getConfiguration();
-			int numStrips = conf.getInt("simjoin.spatial.gridindex.num_strips", 3);
+			int numStrips = conf.getInt("simjoin.spatial.gridindex.num_strips", 1);
 			
 			double width = xMax - xMin;
 			double height = yMax - yMin;

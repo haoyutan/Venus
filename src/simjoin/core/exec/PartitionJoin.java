@@ -9,7 +9,6 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
@@ -18,6 +17,8 @@ import org.apache.hadoop.util.Tool;
 
 import simjoin.core.ItemWritable;
 import simjoin.core.SimJoinConf;
+import simjoin.core.SimJoinUtils;
+import simjoin.core.handler.ItemJoinHandler;
 import simjoin.core.partition.VirtualPartition;
 import simjoin.core.partition.VirtualPartitionID;
 import simjoin.core.partition.VirtualPartitionInfo;
@@ -30,22 +31,36 @@ public class PartitionJoin extends Configured implements Tool {
 	
 	public static final String CK_TASKSCHEDULE_DIR = "simjoin.core.partition.task_schedule_dir";
 	
+	@SuppressWarnings("rawtypes")
 	public static class PartitionJoinMapper
 			extends
 			Mapper<VirtualPartition, VirtualPartition, ItemWritable, ItemWritable> {
+		
+		private ItemJoinHandler<?> itemJoinHandler;
+
+		@Override
+		protected void setup(Context context) throws IOException,
+				InterruptedException {
+			super.setup(context);
+			Configuration conf = context.getConfiguration();
+			itemJoinHandler = SimJoinUtils.createItemJoinHandler(conf);
+			itemJoinHandler.setup(context);
+			itemJoinHandler.setItemOutputMask(ItemWritable.MASK_ID);
+		}
 
 		@Override
 		protected void map(VirtualPartition key, VirtualPartition value,
 				Context context) throws IOException, InterruptedException {
-			final int mask = ItemWritable.MASK_ID;
-			for (ItemWritable item : key) {
-				item.setMask(mask);
-				context.write(item, item);
-			}
-			for (ItemWritable item : value) {
-				item.setMask(mask);
-				context.write(item, item);
-			}
+			context.setStatus(key.getVirtualPartitionInfo() + ","
+					+ value.getVirtualPartitionInfo());
+			itemJoinHandler.joinItem(key, value);
+		}
+
+		@Override
+		protected void cleanup(Context context) throws IOException,
+				InterruptedException {
+			itemJoinHandler.cleanup(context);
+			super.cleanup(context);
 		}
 	}
 	
@@ -61,9 +76,12 @@ public class PartitionJoin extends Configured implements Tool {
 	@Override
 	public int run(String[] args) throws Exception {
 		Configuration conf = getConf();
+		
+		// remove output directory
 		workDir = SimJoinConf.getWorkDir(conf);
 		FileSystem fs = workDir.getFileSystem(conf);
 		fs.delete(workDir, true);
+		
 		Job job = new Job(conf);
 		job.setJarByClass(getClass());
 		job.setInputFormatClass(VirtualPartitionInputFormat.class);

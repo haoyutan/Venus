@@ -1,16 +1,15 @@
 package simjoin.core.partition;
 
 import java.io.IOException;
-import java.util.Iterator;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
+import org.apache.hadoop.io.WritableUtils;
 
 import simjoin.core.ItemWritable;
 
 @SuppressWarnings("rawtypes")
-public class VirtualPartition extends Configured implements
-		Iterator<ItemWritable>, Iterable<ItemWritable> {
+public class VirtualPartition extends Configured {
 	
 	private VirtualPartitionInfo vpInfo;
 	
@@ -20,11 +19,9 @@ public class VirtualPartition extends Configured implements
 			throws IOException {
 		super(conf);
 		this.vpInfo = vpInfo;
-		reset();
 	}
 	
-	public void reset() throws IOException {
-		close();
+	public void open() throws IOException {
 		reader = new VirtualPartitionReader(getConf(), vpInfo);
 	}
 	
@@ -35,11 +32,9 @@ public class VirtualPartition extends Configured implements
 	public synchronized void close() throws IOException {
 		if (reader != null)
 			reader.close();
-		reader = null;
 	}
 
-	@Override
-	public boolean hasNext() {
+	public boolean nextItem() {
 		try {
 			return reader.nextItem();
 		} catch (IOException e) {
@@ -47,18 +42,19 @@ public class VirtualPartition extends Configured implements
 		}
 	}
 
-	@Override
-	public ItemWritable next() {
-		return reader.getCurrentItem();
+	public ItemWritable getCurrentItem() {
+		return getCurrentItem(false);
+	}
+	
+	public ItemWritable getCurrentItem(boolean copy) {
+		return (copy ? WritableUtils.clone(reader.getCurrentItem(), getConf())
+				: reader.getCurrentItem());
 	}
 
 	@Override
-	public void remove() {
-		throw new RuntimeException("Unimplemented method.");
-	}
-
-	@Override
-	public Iterator<ItemWritable> iterator() {
-		return this;
+	public boolean equals(Object obj) {
+		VirtualPartition other = (VirtualPartition) obj;
+		return this.getVirtualPartitionInfo().getId()
+				.equals(other.getVirtualPartitionInfo().getId());
 	}
 }

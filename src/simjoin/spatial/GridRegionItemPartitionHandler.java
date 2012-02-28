@@ -29,7 +29,7 @@ public class GridRegionItemPartitionHandler extends
 	private GridIndex gridIndex;
 
 	@Override
-	public void setup(Configuration conf) throws IOException {
+	public void userSetup(Configuration conf) throws IOException {
 		gridIndex = GridPartitionIndex.loadGridIndex(conf);
 	}
 
