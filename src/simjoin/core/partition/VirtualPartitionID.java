@@ -67,7 +67,7 @@ public class VirtualPartitionID implements WritableComparable<VirtualPartitionID
 	}
 	
 	@Override
-	public boolean equals(Object o) {
+	final public boolean equals(Object o) {
 		if (!(o instanceof VirtualPartitionID))
 			return false;
 		VirtualPartitionID other = (VirtualPartitionID) o;
@@ -75,12 +75,12 @@ public class VirtualPartitionID implements WritableComparable<VirtualPartitionID
 	}
 
 	@Override
-	public int hashCode() {
+	final public int hashCode() {
 		return (int) (mainId * 997 + subId * 163);
 	}
 	
 	@Override
-	public int compareTo(VirtualPartitionID other) {
+	final public int compareTo(VirtualPartitionID other) {
 		int cmp = this.mainId < other.mainId ? -1
 				: (this.mainId == other.mainId ? 0 : 1);
 		if (cmp == 0)
@@ -90,7 +90,7 @@ public class VirtualPartitionID implements WritableComparable<VirtualPartitionID
 	}
 	
 	@Override
-	public String toString() {
+	final public String toString() {
 		return String.format("%016X-%016X", mainId, subId);
 	}
 	

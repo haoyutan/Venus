@@ -70,7 +70,7 @@ public class MbrWritable implements Writable {
 	
 	public boolean intersects(MbrWritable other) {
 		return (this.xMin < other.xMax && this.yMin < other.yMax
-				&& other.xMin < this.xMin && other.yMin < this.yMin);
+				&& other.xMin < this.xMax && other.yMin < this.yMax);
 	}
 
 	// FIXME: for debug purpose only

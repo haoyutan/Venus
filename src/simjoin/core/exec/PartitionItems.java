@@ -157,6 +157,7 @@ public class PartitionItems extends BaseTask {
 				++count;
 			}
 			mos.write("StatNumRecords", key, new LongWritable(count));
+			context.getCounter("PartitionItems Count", "ITEM_COUNT").increment(count);
 		}
 
 		@Override

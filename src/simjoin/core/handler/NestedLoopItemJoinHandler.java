@@ -93,7 +93,8 @@ public class NestedLoopItemJoinHandler<ITEM extends ItemWritable> extends
 	}
 	
 	protected boolean acceptSignaturePair(ITEM item1, ITEM item2) {
-		return item1.getSignature().equals(item2.getSignature());
+		return !item1.getId().equals(item2.getId())
+				&& item1.getSignature().equals(item2.getSignature());
 	}
 
 	@Override
@@ -108,6 +109,7 @@ public class NestedLoopItemJoinHandler<ITEM extends ItemWritable> extends
 	}
 	
 	protected boolean acceptPayloadPair(ITEM item1, ITEM item2) {
-		return item1.getPayload().equals(item2.getPayload());
+		return !item1.getId().equals(item2.getId())
+				&& item1.getPayload().equals(item2.getPayload());
 	}
 }
