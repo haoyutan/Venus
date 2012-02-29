@@ -70,8 +70,10 @@ public abstract class BaseTask extends Configured implements Tool {
 		taskOutputPath = getTaskOutputPath(conf);
 		
 		if (BaseTask.isExecSuccess(conf, taskOutputPath)) {
-			Logger.getLogger(getClass()).info("Found saved results. Skip.");
-			return 0;
+			if (recover()) {
+				Logger.getLogger(getClass()).info("Found saved results. Recovered.");
+				return 0;
+			}
 		}
 		
 		loadExecPlan();
@@ -86,6 +88,10 @@ public abstract class BaseTask extends Configured implements Tool {
 	}
 	
 	protected abstract int runTask(String[] args) throws Exception;
+	
+	protected boolean recover() {
+		return true;
+	}
 	
 	private void loadExecPlan() throws IOException {
 		if (taskInputPath == null) // This is the first task.

@@ -7,9 +7,11 @@ import java.io.PrintWriter;
 import java.io.StringWriter;
 
 import org.apache.hadoop.io.Writable;
+import org.apache.hadoop.io.WritableComparable;
 
-public abstract class ItemWritable<I extends Writable, P extends Writable, S extends Writable>
-		implements Writable{
+@SuppressWarnings("rawtypes")
+public abstract class ItemWritable<I extends WritableComparable, P extends Writable, S extends Writable>
+		implements WritableComparable<ItemWritable> {
 	
 	public static final int MASK_ID = 0x1;
 	public static final int MASK_PLD = 0x2;
@@ -117,5 +119,10 @@ public abstract class ItemWritable<I extends Writable, P extends Writable, S ext
 			pw.format(",,{%s}", signature.toString());
 		
 		return sw.toString();
+	}
+	
+	@Override
+	public int hashCode() {
+		return id.hashCode();
 	}
 }

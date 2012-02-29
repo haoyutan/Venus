@@ -55,6 +55,7 @@ public class PartitionItems extends BaseTask {
 		job.setMapOutputValueClass(itemClass);
 		
 		job.setReducerClass(PartitionItemsReducer.class);
+		job.setNumReduceTasks(SimJoinConf.getClusterTaskSlots(conf) * 2);
 		job.setOutputFormatClass(SequenceFileOutputFormat.class);
 		job.setOutputKeyClass(itemClass);
 		job.setOutputValueClass(NullWritable.class);

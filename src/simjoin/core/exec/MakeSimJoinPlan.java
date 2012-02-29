@@ -1,10 +1,14 @@
 package simjoin.core.exec;
 
+import java.io.DataInputStream;
+import java.io.IOException;
 import java.util.Map;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.mapreduce.Job;
 
 import simjoin.core.ItemWritable;
@@ -27,6 +31,27 @@ public class MakeSimJoinPlan extends BaseTask {
 	
 	public Configuration getPlan() {
 		return new Configuration(getConf());
+	}
+	
+	@Override
+	protected boolean recover() {
+		Configuration conf = getConf();
+		Path planFile = new Path(taskOutputPath, FILENAME_EXEC_PLAN);
+		try {
+			FileSystem fs = planFile.getFileSystem(conf);
+			if (fs.exists(planFile) && fs.isFile(planFile)) {
+				Configuration plan = new Configuration();
+				DataInputStream in = fs.open(planFile);
+				plan.readFields(in);
+				in.close();
+				setConf(plan);
+				return true;
+			} else
+				return false;
+		} catch (IOException e) {
+			LOG.info("Recover failed with exception: " + e);
+			return false;
+		}
 	}
 	
 	@Override

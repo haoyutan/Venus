@@ -9,7 +9,7 @@
   <property name="build.dir" value="${basedir}/build" />
   <property name="build.classes" value="${build.dir}/classes" />
 <!--
-  <property name="hadoop.home" value="/home/hytan-hadoop/local/opt/hadoop-0.20.2/" />
+  <property name="hadoop.home" value="/home/hytan-hadoop/local/opt/hadoop/" />
 -->
 
   <path id="hadoop.classpath">
