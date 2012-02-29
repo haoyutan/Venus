@@ -6,14 +6,12 @@ import java.util.Map;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.SequenceFile.CompressionType;
+import org.apache.hadoop.io.compress.SnappyCodec;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Mapper;
-import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
-import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
-import org.apache.hadoop.util.Tool;
+import org.apache.hadoop.mapreduce.lib.output.SequenceFileOutputFormat;
 
 import simjoin.core.ItemWritable;
 import simjoin.core.SimJoinConf;
@@ -25,11 +23,14 @@ import simjoin.core.partition.VirtualPartitionInfo;
 import simjoin.core.partition.VirtualPartitionInputFormat;
 import simjoin.core.partition.VirtualPartitionReader;
 
-public class PartitionJoin extends Configured implements Tool {
+public class PartitionJoin extends BaseTask {
 	
 	private static final Log LOG = LogFactory.getLog(PartitionJoin.class);
 	
-	public static final String CK_TASKSCHEDULE_DIR = "simjoin.core.partition.task_schedule_dir";
+	public static final String CK_JOIN_TYPE = "simjoin.core.exec.partitionjoin.join_type";
+	public static final int CV_JOIN_TYPE_SIG_PAYLOAD = 0;
+	public static final int CV_JOIN_TYPE_SIG = 1;
+	public static final int CV_JOIN_TYPE_PAYLOAD = 2;
 	
 	@SuppressWarnings("rawtypes")
 	public static class PartitionJoinMapper
@@ -37,12 +38,16 @@ public class PartitionJoin extends Configured implements Tool {
 			Mapper<VirtualPartition, VirtualPartition, ItemWritable, ItemWritable> {
 		
 		private ItemJoinHandler<?> itemJoinHandler;
+		
+		private int joinType;
 
 		@Override
 		protected void setup(Context context) throws IOException,
 				InterruptedException {
 			super.setup(context);
 			Configuration conf = context.getConfiguration();
+			joinType = conf.getInt(CK_JOIN_TYPE, CV_JOIN_TYPE_SIG_PAYLOAD);
+			LOG.info("Join type: " + joinType);
 			itemJoinHandler = SimJoinUtils.createItemJoinHandler(conf);
 			itemJoinHandler.setup(context);
 			itemJoinHandler.setItemOutputMask(ItemWritable.MASK_ID);
@@ -53,7 +58,22 @@ public class PartitionJoin extends Configured implements Tool {
 				Context context) throws IOException, InterruptedException {
 			context.setStatus(key.getVirtualPartitionInfo() + ","
 					+ value.getVirtualPartitionInfo());
-			itemJoinHandler.joinItem(key, value);
+			switch (joinType) {
+			case CV_JOIN_TYPE_SIG_PAYLOAD:
+				itemJoinHandler.joinItem(key, value);
+				break;
+			case CV_JOIN_TYPE_SIG:
+				itemJoinHandler.joinSignature(key, value);
+				break;
+			case CV_JOIN_TYPE_PAYLOAD:
+				itemJoinHandler.joinPayload(key, value);
+				break;
+			default:
+				throw new RuntimeException("Wrong join type: " + joinType);
+			}
+			LOG.info("Finished partition pair: "
+					+ key.getVirtualPartitionInfo().getId() + ","
+					+ value.getVirtualPartitionInfo().getId());
 		}
 
 		@Override
@@ -64,33 +84,46 @@ public class PartitionJoin extends Configured implements Tool {
 		}
 	}
 	
-	private Path workDir;
-	
-	private Path taskScheduleDir;
-	
 	public PartitionJoin(Configuration conf) {
-		setConf(conf);
-		workDir = SimJoinConf.getWorkDir(conf);
+		super(conf);
 	}
 	
 	@Override
-	public int run(String[] args) throws Exception {
+	protected int runTask(String[] args) throws Exception {
+		return runJob(args);
+	}
+	
+	@SuppressWarnings("rawtypes")
+	public int runJob(String[] args) throws Exception {
 		Configuration conf = getConf();
 		
 		// remove output directory
-		workDir = SimJoinConf.getWorkDir(conf);
-		FileSystem fs = workDir.getFileSystem(conf);
-		fs.delete(workDir, true);
+		FileSystem fs = taskOutputPath.getFileSystem(conf);
+		fs.delete(taskOutputPath, true);
 		
+		// execute job
 		Job job = new Job(conf);
+		String simJoinName = SimJoinConf.getSimJoinName(conf);
+		job.setJobName(simJoinName + "-" + getClass().getSimpleName());
 		job.setJarByClass(getClass());
+		
 		job.setInputFormatClass(VirtualPartitionInputFormat.class);
-		VirtualPartitionInputFormat.setInputDir(job,
-				new Path(conf.get(CK_TASKSCHEDULE_DIR)));
+		VirtualPartitionInputFormat.setInputDir(job, taskInputPath);
 		job.setMapperClass(PartitionJoinMapper.class);
 		job.setNumReduceTasks(0);
-		job.setOutputFormatClass(TextOutputFormat.class);
-		FileOutputFormat.setOutputPath(job, workDir);
+		
+		Class<? extends ItemWritable> itemClass = SimJoinConf
+				.getItemClass(conf);
+		job.setOutputKeyClass(itemClass);
+		job.setOutputValueClass(itemClass);
+		
+		job.setOutputFormatClass(SequenceFileOutputFormat.class);
+		SequenceFileOutputFormat.setOutputPath(job, taskOutputPath);
+		SequenceFileOutputFormat.setCompressOutput(job, true);
+		SequenceFileOutputFormat.setOutputCompressionType(job,
+				CompressionType.BLOCK);
+		SequenceFileOutputFormat.setOutputCompressorClass(job,
+				SnappyCodec.class);
 		
 		return (job.waitForCompletion(true) ? 0 : 1);
 	}
@@ -99,11 +132,10 @@ public class PartitionJoin extends Configured implements Tool {
 	@SuppressWarnings({ "rawtypes", "unused" })
 	private void testVirtualPartitionReader() throws Exception {
 		Configuration conf = getConf();
-		taskScheduleDir = new Path(conf.get(CK_TASKSCHEDULE_DIR));
-		LOG.info("Task schedule dir: " + taskScheduleDir);
+		LOG.info("Task input dir: " + taskInputPath);
 
 		Map<VirtualPartitionID, VirtualPartitionInfo> vpInfoMap = VirtualPartitionInfo
-				.readVirtualPartitionInfo(conf, taskScheduleDir, true);
+				.readVirtualPartitionInfo(conf, taskInputPath, true);
 
 		long totalCount = 0;
 		for (VirtualPartitionID id : vpInfoMap.keySet()) {

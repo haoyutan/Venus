@@ -10,10 +10,8 @@ import java.util.Map;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.util.Tool;
 
 import simjoin.core.SimJoinConf;
 import simjoin.core.SimJoinUtils;
@@ -23,15 +21,11 @@ import simjoin.core.partition.IDPairList;
 import simjoin.core.partition.VirtualPartitionID;
 import simjoin.core.partition.VirtualPartitionInfo;
 
-public class SchedulePartitionPairs extends Configured implements Tool {
+public class SchedulePartitionPairs extends BaseTask {
 	
 	private static final Log LOG = LogFactory.getLog(SchedulePartitionPairs.class);
 	
-	public static final String CK_PARTITIONS_DIR = "simjoin.core.exec.partitions_dir"; 
-	
-	private Path workDir;
-	
-	private Path partitionsDir, summaryFile;
+	private Path summaryFile;
 	
 	private Map<VirtualPartitionID, VirtualPartitionInfo> origVpInfoMap, splitVpInfoMap;
 	
@@ -46,27 +40,12 @@ public class SchedulePartitionPairs extends Configured implements Tool {
 	private IDPairList[] tasks;
 	
 	public SchedulePartitionPairs(Configuration conf) {
-		setConf(conf);
-		workDir = SimJoinConf.getWorkDir(conf);
+		super(conf);
 	}
 
 	@Override
-	public int run(String[] args) throws Exception {
-		if (recover())
-			return 0;
-		
-		int ret = doScheduling();
-		if (ret == 0)
-			ExecUtils.setExecSuccess(getConf(), workDir);
-		return ret;
-	}
-	
-	private boolean recover() throws IOException {
-		if (ExecUtils.isExecSuccess(getConf(), workDir)) {
-			LOG.info("Found saved results. Skip.");
-			return true;
-		} else
-			return false;
+	protected int runTask(String[] args) throws Exception {
+		return doScheduling();
 	}
 	
 	private int doScheduling() throws IOException {
@@ -83,9 +62,8 @@ public class SchedulePartitionPairs extends Configured implements Tool {
 	
 	private void readOriginalParititionInfo() throws IOException {
 		Configuration conf = getConf();
-		partitionsDir = new Path(conf.get(CK_PARTITIONS_DIR));
 		origVpInfoMap = VirtualPartitionInfo.readVirtualPartitionInfo(conf,
-				partitionsDir, true);
+				taskInputPath, true);
 		LOG.info("Partitions info loaded from " + summaryFile + " ("
 				+ origVpInfoMap.size() + " partitions).");
 	}
@@ -110,10 +88,11 @@ public class SchedulePartitionPairs extends Configured implements Tool {
 		writer.close();
 	}
 	
+	// TODO
 	private void getSchedulingArguments() throws IOException {
 		Configuration conf = getConf();
 		numTasks = SimJoinConf.getClusterTaskSlots(conf) * 2;
-		minPartitionLength = Math.max(8000000,
+		minPartitionLength = Math.max(2000000,
 				SimJoinConf.getSequenceFileCompressionBlockSize(conf));
 		LOG.info("Arguments for scheduling: numTasks = " + numTasks
 				+ ", minPartitionLength = " + minPartitionLength);
@@ -243,23 +222,23 @@ public class SchedulePartitionPairs extends Configured implements Tool {
 	}
 	
 	private void writeVirtualPartitionInfo() throws IOException {
-		VirtualPartitionInfo.writeVirtualPartitionInfo(getConf(), workDir,
+		VirtualPartitionInfo.writeVirtualPartitionInfo(getConf(), taskOutputPath,
 				splitVpInfoMap.values(), true);
 		LOG.info("Virtual partition info written to "
-				+ new Path(workDir, VirtualPartitionInfo.FILENAME_SUMMARY)
+				+ new Path(taskOutputPath, VirtualPartitionInfo.FILENAME_SUMMARY)
 				+ ".");
 	}
 	
 	private void writeTaskInputFiles() throws IOException {
 		for (int i = 0; i < tasks.length; i++)
 			IDPairList.writeIDPairList(getConf(),
-					new Path(workDir, String.format("%s%05d", "T-", i)),
+					new Path(taskOutputPath, String.format("%s%05d", "T-", i)),
 					tasks[i], true);
 		LOG.info("Task input files created.");
 	}
 	
 	private PrintWriter createLogFileWriter(String logName) throws IOException {
-		return createFileWriter(new Path(workDir, "_log_" + logName + ".log"));
+		return createFileWriter(new Path(taskOutputPath, "_log_" + logName + ".log"));
 	}
 	
 	private PrintWriter createFileWriter(Path file) throws IOException {

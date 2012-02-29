@@ -132,7 +132,7 @@ public class GridPartitionIndex extends Configured implements Tool {
 		protected void cleanup(Context context)
 				throws IOException, InterruptedException {
 			Configuration conf = context.getConfiguration();
-			int numStrips = conf.getInt("simjoin.spatial.gridindex.num_strips", 1);
+			int numStrips = conf.getInt("simjoin.spatial.gridindex.num_strips", 3);
 			
 			double width = xMax - xMin;
 			double height = yMax - yMin;
@@ -220,7 +220,11 @@ public class GridPartitionIndex extends Configured implements Tool {
 	
 	@Override
 	public int run(String[] args) throws Exception {
-		Job job = new Job(getConf());
+		Configuration conf = getConf();
+		if (args.length > 1)
+			conf.set("simjoin.spatial.gridindex.num_strips", args[1]);
+		
+		Job job = new Job(conf);
 		job.setJarByClass(getClass());
 		job.setJobName("Step-0-Preprocessing");
 		

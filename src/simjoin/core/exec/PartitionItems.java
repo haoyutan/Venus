@@ -8,7 +8,6 @@ import java.util.Map;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -24,7 +23,6 @@ import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.mapreduce.lib.output.MultipleOutputs;
 import org.apache.hadoop.mapreduce.lib.output.SequenceFileOutputFormat;
-import org.apache.hadoop.util.Tool;
 
 import simjoin.core.ItemWritable;
 import simjoin.core.SimJoinConf;
@@ -35,7 +33,7 @@ import simjoin.core.partition.PartitionID;
 import simjoin.core.partition.VirtualPartitionID;
 import simjoin.core.partition.VirtualPartitionInfo;
 
-public class PartitionItems extends Configured implements Tool {
+public class PartitionItems extends BaseTask {
 	
 	private static final Log LOG = LogFactory.getLog(PartitionItems.class);
 
@@ -168,46 +166,30 @@ public class PartitionItems extends Configured implements Tool {
 		}
 	}
 	
-	private Path workDir;
-	
 	public PartitionItems(Configuration conf) {
 		super(conf);
-		workDir = SimJoinConf.getWorkDir(conf);
 	}
 
 	@Override
-	public int run(String[] args) throws Exception {
-		if (recover())
-			return 0;
-		
+	protected int runTask(String[] args) throws Exception {
 		int ret = runJob(args);
-		if (ret == 0) {
+		if (ret == 0)
 			createPartitionSummary();
-			ExecUtils.setExecSuccess(getConf(), workDir);
-		}
 		return ret;
-	}
-	
-	private boolean recover() throws IOException {
-		if (ExecUtils.isExecSuccess(getConf(), workDir)) {
-			LOG.info("Found saved results. Skip.");
-			return true;
-		} else
-			return false;
 	}
 	
 	private int runJob(String[] args) throws Exception {
 		Configuration conf = getConf();
 		
 		// delete output path
-		FileSystem fs = workDir.getFileSystem(conf);
-		fs.delete(workDir, true);
+		FileSystem fs = taskOutputPath.getFileSystem(conf);
+		fs.delete(taskOutputPath, true);
 		
 		// execute job
 		Job job = new Job(conf);
 		String simJoinName = SimJoinConf.getSimJoinName(conf);
-		job.setJobName(simJoinName + "-ItemsPartition");
-		FileOutputFormat.setOutputPath(job, workDir);
+		job.setJobName(simJoinName + "-" + getClass().getSimpleName());
+		FileOutputFormat.setOutputPath(job, taskOutputPath);
 		configureJob(job);
 		return (job.waitForCompletion(true) ? 0 : 1);
 	}
@@ -215,13 +197,13 @@ public class PartitionItems extends Configured implements Tool {
 	private void createPartitionSummary() throws IOException {
 		LOG.info("Creating summary file...");
 		Configuration conf = getConf();
-		FileSystem fs = workDir.getFileSystem(conf);
+		FileSystem fs = taskOutputPath.getFileSystem(conf);
 
 		Map<VirtualPartitionID, VirtualPartitionInfo> vpInfoMap = 
 				new HashMap<VirtualPartitionID, VirtualPartitionInfo>();
 		
 		// get path and size of each partition file
-		FileStatus[] partitionFileStatus = fs.listStatus(workDir,
+		FileStatus[] partitionFileStatus = fs.listStatus(taskOutputPath,
 				new PrefixPathFilter(PARTITION__FILENAME_PREFIX));
 		int prefixLength = PARTITION__FILENAME_PREFIX.length();
 		for (FileStatus status : partitionFileStatus) {
@@ -236,7 +218,7 @@ public class PartitionItems extends Configured implements Tool {
 		LOG.info("  Partition file path and size loaded.");
 
 		// get the number of records in each partition
-		FileStatus[] metaFileStatus = fs.listStatus(workDir,
+		FileStatus[] metaFileStatus = fs.listStatus(taskOutputPath,
 				new PrefixPathFilter("StatNumRecords-"));
 		for (FileStatus status : metaFileStatus) {
 			SequenceFile.Reader reader = new SequenceFile.Reader(fs,
@@ -249,14 +231,14 @@ public class PartitionItems extends Configured implements Tool {
 		}
 		LOG.info("  Number of records loaded.");
 
-		VirtualPartitionInfo.writeVirtualPartitionInfo(conf, workDir,
+		VirtualPartitionInfo.writeVirtualPartitionInfo(conf, taskOutputPath,
 				vpInfoMap.values(), true);
 		LOG.info("  Summary file written.");
 		
 		// remove useless files (StatNumRecords-* and part-r-*)
 		for (FileStatus status : metaFileStatus)
 			fs.delete(status.getPath(), true);
-		FileStatus[] partFileStatus = fs.listStatus(workDir,
+		FileStatus[] partFileStatus = fs.listStatus(taskOutputPath,
 				new PrefixPathFilter("part-r-"));
 		for (FileStatus status : partFileStatus)
 			fs.delete(status.getPath(), true);

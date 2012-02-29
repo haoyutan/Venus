@@ -1,18 +1,11 @@
 package simjoin.core.exec;
 
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.IOException;
 import java.util.Map;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.conf.Configured;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.mapreduce.Job;
-import org.apache.hadoop.util.Tool;
 
 import simjoin.core.ItemWritable;
 import simjoin.core.SimJoinConf;
@@ -20,22 +13,16 @@ import simjoin.core.handler.ItemBuildHandler;
 import simjoin.core.handler.ItemPartitionHandler;
 import simjoin.core.handler.NestedLoopItemJoinHandler;
 
-public class SimJoinPlan extends Configured implements Tool {
+public class MakeSimJoinPlan extends BaseTask {
 	
-	private static final Log LOG = LogFactory.getLog(SimJoinPlan.class);
+	private static final Log LOG = LogFactory.getLog(MakeSimJoinPlan.class);
 	
 	private static final String CK_PLAN_PREFIX = "simjoin.core.plan";
 	
 	public static final String CK_PLAN_ALGO = CK_PLAN_PREFIX + ".algorithm";
-	
-	private static final String FILENAME_CONF = "simjoin-conf-with-plan.dat";
-	private static final String FILENAME_XML = "simjoin-conf-with-plan.xml";
-	
-	private Path workDir;
 
-	public SimJoinPlan(Configuration conf) {
+	public MakeSimJoinPlan(Configuration conf) {
 		super(conf);
-		workDir = SimJoinConf.getWorkDir(conf);
 	}
 	
 	public Configuration getPlan() {
@@ -43,65 +30,11 @@ public class SimJoinPlan extends Configured implements Tool {
 	}
 	
 	@Override
-	public int run(String[] args) throws Exception {
-		boolean recovered = recover();
+	protected int runTask(String[] args) throws Exception {
 		checkConfiguration();
-		if (!recovered) {
-			plan();
-			savePlan();
-		}
+		plan();
 		printPlan();
 		return 0;
-	}
-	
-	private boolean recover() {
-		Configuration conf = getConf();
-		Path confFile = new Path(workDir, FILENAME_CONF);
-		FileSystem fs;
-		boolean found;
-		try {
-			fs = confFile.getFileSystem(conf);
-			found = fs.exists(confFile);
-		} catch (IOException e) {
-			return false;
-		}
-		if (found) {
-			LOG.info("Found saved results. Try to recover...");
-			Configuration savedConf = new Configuration();
-			try {
-				DataInputStream in = fs.open(confFile);
-				savedConf.readFields(in);
-				in.close();
-			} catch (IOException e) {
-				LOG.info("Failed to recover: " + e.getMessage());
-				return false;
-			}
-			setConf(savedConf);
-		} else
-			return false;
-
-		LOG.info("Recovered with success.");
-		return true;
-	}
-	
-	private void savePlan() throws IOException {
-		LOG.info("Saving plan...");
-		
-		// save binary (used for recovery)
-		Configuration conf = getConf();
-		Path confFile = new Path(workDir, FILENAME_CONF);
-		FileSystem fs = confFile.getFileSystem(conf);
-		DataOutputStream out = fs.create(confFile, true);
-		conf.write(out);
-		out.close();
-		
-		// save xml (used for logging)
-		Path xmlFile = new Path(workDir, FILENAME_XML);
-		out = fs.create(xmlFile, true);
-		conf.writeXml(out);
-		out.close();
-		
-		LOG.info("Saving plan... Done.");
 	}
 	
 	private void printPlan() {
@@ -122,6 +55,7 @@ public class SimJoinPlan extends Configured implements Tool {
 		if (SimJoinConf.CV_ALGO_AUTO.equals(algorithm))
 			algorithm = SimJoinConf.CV_ALGO_SHADOW;
 		conf.set(CK_PLAN_ALGO, algorithm);
+		LOG.info("  Planned algorithm: " + algorithm);
 		LOG.info("Making similarity join plan... Done.");
 	}
 

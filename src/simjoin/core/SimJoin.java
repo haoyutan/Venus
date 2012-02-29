@@ -1,5 +1,7 @@
 package simjoin.core;
 
+import java.util.ArrayList;
+
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
@@ -7,16 +9,18 @@ import org.apache.hadoop.conf.Configured;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.util.Tool;
 
+import simjoin.core.exec.BaseTask;
+import simjoin.core.exec.DeduplicateItemPairs;
+import simjoin.core.exec.MakeSimJoinPlan;
 import simjoin.core.exec.PartitionItems;
 import simjoin.core.exec.PartitionJoin;
 import simjoin.core.exec.SchedulePartitionPairs;
-import simjoin.core.exec.SimJoinPlan;
 
 public class SimJoin extends Configured implements Tool {
 	
 	private static final Log LOG = LogFactory.getLog(SimJoin.class);
 	
-	private Path workDir;
+	private Path workDir, planDir;
 
 	public SimJoin(Configuration conf) {
 		super(conf);
@@ -28,96 +32,123 @@ public class SimJoin extends Configured implements Tool {
 	
 		Configuration conf = new Configuration(getConf());
 		workDir = SimJoinConf.getWorkDir(conf);
+		planDir = new Path(workDir, "00-MakeSimJoinPlan");
 		
 		// Stage 00
-		LOG.info("Stage-00-SimJoinPlan: Start...");
-		SimJoinConf.setWorkDir(conf, new Path(workDir, "Stage-00-SimJoinPlan"));
-		SimJoinPlan simJoinPlan = new SimJoinPlan(conf);
+		LOG.info("00-MakeSimJoinPlan: Start...");
+		BaseTask.setTaskOutputPath(conf, planDir);
+		MakeSimJoinPlan simJoinPlan = new MakeSimJoinPlan(conf);
 		ret = simJoinPlan.run(null);
-		LOG.info("Stage-00-SimJoinPlan: Finished with success.");
+		LOG.info("00-MakeSimJoinPlan: Finished with success.");
 		
 		Configuration plan = simJoinPlan.getPlan();
 		
 		// plan
-		String algorithm = plan.get(SimJoinPlan.CK_PLAN_ALGO);
+		String algorithm = plan.get(MakeSimJoinPlan.CK_PLAN_ALGO);
 		if (SimJoinConf.CV_ALGO_CLONE.equals(algorithm))
-			ret = doCloneJoin(plan, args);
+			ret = doCloneJoin(plan);
 		else if (SimJoinConf.CV_ALGO_SHADOW.equals(algorithm))
-			ret = doShadowJoin(plan, args);
+			ret = doShadowJoin(plan);
 		else {
 			LOG.error("Does not support planned algorithm: " + algorithm);
 			ret = -1;
 		}
-			
+
 		return ret;
 	}
 	
-	private int doCloneJoin(Configuration plan, String[] args) throws Exception {
-		int ret = -1;
-		final String ALGONAME = "CloneJoin";
+	private int doCloneJoin(Configuration plan) throws Exception {
+		SimJoinTaskChain chain = new SimJoinTaskChain("01-CloneJoin", workDir,
+				planDir);
 		Configuration conf;
 		
-		// Stage 01
-		String stage01Name = "Stage-01-" + ALGONAME + "-PartitionItems";
 		conf = new Configuration(plan);
 		conf.setBoolean(PartitionItems.CK_OUTPUT_PAYLOAD, true);
-		SimJoinConf.setWorkDir(conf, new Path(workDir, stage01Name));
-
-		LOG.info(stage01Name + ": Start...");
-		PartitionItems partitionItems = new PartitionItems(conf);
-		ret = partitionItems.run(null);
-		LOG.info(stage01Name + ": Finished with success.");
-		if (ret != 0)
-			return ret;
+		chain.appendTask(new PartitionItems(conf));
 		
-		// Stage 02
-		String stage02Name = "Stage-02-" + ALGONAME + "-SchedulePartitionPairs";
 		conf = new Configuration(plan);
-		SimJoinConf.setPath(conf, SchedulePartitionPairs.CK_PARTITIONS_DIR,
-				new Path(workDir, stage01Name));
-		SimJoinConf.setWorkDir(conf, new Path(workDir, stage02Name));
+		chain.appendTask(new SchedulePartitionPairs(conf));
 		
-		LOG.info(stage02Name + ": Start...");
-		SchedulePartitionPairs schedulePartitionPairs = new SchedulePartitionPairs(
-				conf);
-		ret = schedulePartitionPairs.run(null);
-		LOG.info(stage02Name + ": Finished with success.");
-		if (ret != 0)
-			return ret;
-		
-		// Stage 03
-		String stage03Name = "Stage-03-" + ALGONAME + "-PartitionJoin";
 		conf = new Configuration(plan);
-		SimJoinConf.setPath(conf, PartitionJoin.CK_TASKSCHEDULE_DIR,
-				new Path(workDir, stage02Name));
-		SimJoinConf.setWorkDir(conf, new Path(workDir, stage03Name));
+		conf.setInt(PartitionJoin.CK_JOIN_TYPE,
+				PartitionJoin.CV_JOIN_TYPE_SIG_PAYLOAD);
+		chain.appendTask(new PartitionJoin(conf));
 		
-		LOG.info(stage03Name + ": Start...");
-		PartitionJoin partitionJoin = new PartitionJoin(conf);
-		ret = partitionJoin.run(null);
-		LOG.info(stage02Name + ": Finished with success.");
-		if (ret != 0)
-			return ret;
+		conf = new Configuration(plan);
+		chain.appendTask(new DeduplicateItemPairs(conf));
 		
-		return ret;
+		return chain.run();
 	}
 	
-	private int doShadowJoin(Configuration plan, String[] args) throws Exception {
-		int ret = -1;
-		final String ALGONAME = "ShadowJoin";
-		String stageName;
+	private int doShadowJoin(Configuration plan) throws Exception {
+		SimJoinTaskChain chain = new SimJoinTaskChain("01-ShadowJoin", workDir,
+				planDir);
 		Configuration conf;
 		
-		// Stage 01
-		stageName = "Stage-01-" + ALGONAME + "-PartitionItems";
 		conf = new Configuration(plan);
 		conf.setBoolean(PartitionItems.CK_OUTPUT_PAYLOAD, false);
-		LOG.info(stageName + ": Start...");
-		SimJoinConf.setWorkDir(conf, new Path(workDir, stageName));
-		PartitionItems partitionItems = new PartitionItems(conf);
-		ret = partitionItems.run(null);
-		LOG.info(stageName + ": Finished with success.");
+		chain.appendTask(new PartitionItems(conf));
 		
-		return ret;
+		conf = new Configuration(plan);
+		chain.appendTask(new SchedulePartitionPairs(conf));
+		
+		conf = new Configuration(plan);
+		conf.setInt(PartitionJoin.CK_JOIN_TYPE, PartitionJoin.CV_JOIN_TYPE_SIG);
+		chain.appendTask(new PartitionJoin(conf));
+		
+		conf = new Configuration(plan);
+		chain.appendTask(new DeduplicateItemPairs(conf));
+		
+		return chain.run();
+	}
+	
+	private static class SimJoinTaskChain {
+		
+		private String taskChainName;
+		
+		private ArrayList<BaseTask> taskChain;
+		
+		private Path workDir, initInputPath;
+		
+		public SimJoinTaskChain(String name, Path workDir, Path initInputPath) {
+			this.taskChainName = name;
+			this.taskChain = new ArrayList<BaseTask>();
+			this.workDir = workDir;
+			this.initInputPath = initInputPath;
+		}
+		
+		public void appendTask(BaseTask task) {
+			taskChain.add(task);
+		}
+		
+		public int run() throws Exception {
+			if (taskChain.size() == 0)
+				return 0;
+			
+			int ret = -1;
+			for (int i = 0; i < taskChain.size(); i++) {
+				String stageName = getStageName(i);
+				LOG.info(stageName + ": Start...");
+				BaseTask task = taskChain.get(i);
+				BaseTask.setTaskInputPath(task.getConf(),
+						i == 0 ? initInputPath : new Path(workDir,
+								getStageName(i - 1)));
+				BaseTask.setTaskOutputPath(task.getConf(), new Path(workDir,
+						stageName));
+				ret = task.run(null);
+				if (ret != 0) {
+					LOG.info(stageName + ": Failed.");
+					return ret;
+				}
+				LOG.info(stageName + ": Finished with success.");
+			}
+			return ret;
+		}
+		
+		private String getStageName(int taskIndex) {
+			return String.format("%s-Stage-%02d-%s", taskChainName,
+					taskIndex + 1, taskChain.get(taskIndex).getClass()
+							.getSimpleName());
+		}
 	}
 }
