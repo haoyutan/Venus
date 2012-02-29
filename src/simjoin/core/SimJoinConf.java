@@ -35,6 +35,8 @@ public class SimJoinConf extends Configuration {
 	public static final String CK_HANDLER_ITEMJOIN_CLASS ="simjoin.core.handler.itemjoin.class";
 	
 	public static final String CK_CLUSTER_TASK_SLOTS = "simjoin.core.cluster.task.slots";
+	
+	public static final String CK_SKIP_DEDUP = "simjoin.core.deduplication.skip";
 
 	public SimJoinConf() {
 		super(new Configuration());
@@ -269,5 +271,22 @@ public class SimJoinConf extends Configuration {
 	
 	public int getClusterTaskSlots() {
 		return getClusterTaskSlots(this);
+	}
+	
+	// CK_NEED_DEDUP
+	public static void setSkipDeduplication(Configuration conf, boolean isSkip) {
+		conf.setBoolean(CK_SKIP_DEDUP, isSkip);
+	}
+	
+	public void setSkipDeduplication(boolean isSkip) {
+		setSkipDeduplication(this, isSkip);
+	}
+	
+	public static boolean isSkipDeduplication(Configuration conf) {
+		return conf.getBoolean(CK_SKIP_DEDUP, false);
+	}
+	
+	public boolean isSkipDeduplication() {
+		return isSkipDeduplication(this);
 	}
 }

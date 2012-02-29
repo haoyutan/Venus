@@ -74,8 +74,10 @@ public class SimJoin extends Configured implements Tool {
 				PartitionJoin.CV_JOIN_TYPE_SIG_PAYLOAD);
 		chain.appendTask(new PartitionJoin(conf));
 		
-		conf = new Configuration(plan);
-		chain.appendTask(new DeduplicateItemPairs(conf));
+		if (!SimJoinConf.isSkipDeduplication(plan)) {
+			conf = new Configuration(plan);
+			chain.appendTask(new DeduplicateItemPairs(conf));
+		}
 		
 		return chain.run();
 	}
@@ -96,8 +98,10 @@ public class SimJoin extends Configured implements Tool {
 		conf.setInt(PartitionJoin.CK_JOIN_TYPE, PartitionJoin.CV_JOIN_TYPE_SIG);
 		chain.appendTask(new PartitionJoin(conf));
 		
-		conf = new Configuration(plan);
-		chain.appendTask(new DeduplicateItemPairs(conf));
+		if (!SimJoinConf.isSkipDeduplication(plan)) {
+			conf = new Configuration(plan);
+			chain.appendTask(new DeduplicateItemPairs(conf));
+		}
 		
 		return chain.run();
 	}

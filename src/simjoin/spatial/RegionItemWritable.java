@@ -10,10 +10,4 @@ public class RegionItemWritable extends
 	public RegionItemWritable() {
 		super(LongWritable.class, RegionWritable.class, MbrWritable.class, true);
 	}
-
-	@SuppressWarnings("rawtypes")
-	@Override
-	public int compareTo(ItemWritable o) {
-		return getId().compareTo(o.getId());
-	}
 }

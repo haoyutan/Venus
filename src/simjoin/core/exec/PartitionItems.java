@@ -173,20 +173,17 @@ public class PartitionItems extends BaseTask {
 
 	@Override
 	protected int runTask(String[] args) throws Exception {
-		int ret = runJob(args);
+		Configuration conf = getConf();
+		FileSystem fs = taskOutputPath.getFileSystem(conf);
+		fs.delete(taskOutputPath, true);
+		int ret = runJob();
 		if (ret == 0)
 			createPartitionSummary();
 		return ret;
 	}
 	
-	private int runJob(String[] args) throws Exception {
+	private int runJob() throws Exception {
 		Configuration conf = getConf();
-		
-		// delete output path
-		FileSystem fs = taskOutputPath.getFileSystem(conf);
-		fs.delete(taskOutputPath, true);
-		
-		// execute job
 		Job job = new Job(conf);
 		String simJoinName = SimJoinConf.getSimJoinName(conf);
 		job.setJobName(simJoinName + "-" + getClass().getSimpleName());

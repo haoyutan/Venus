@@ -24,6 +24,8 @@ public class MakeSimJoinPlan extends BaseTask {
 	private static final String CK_PLAN_PREFIX = "simjoin.core.plan";
 	
 	public static final String CK_PLAN_ALGO = CK_PLAN_PREFIX + ".algorithm";
+	
+	public static final String CK_PLAN_SKIP_DEDUP = CK_PLAN_PREFIX + ".skip_dedup";
 
 	public MakeSimJoinPlan(Configuration conf) {
 		super(conf);
@@ -81,6 +83,11 @@ public class MakeSimJoinPlan extends BaseTask {
 			algorithm = SimJoinConf.CV_ALGO_SHADOW;
 		conf.set(CK_PLAN_ALGO, algorithm);
 		LOG.info("  Planned algorithm: " + algorithm);
+
+		boolean skipDedup = SimJoinConf.isSkipDeduplication(conf);
+		conf.setBoolean(CK_PLAN_SKIP_DEDUP, skipDedup);
+		LOG.info("  Skip deduplication: " + skipDedup);
+		
 		LOG.info("Making similarity join plan... Done.");
 	}
 
@@ -133,6 +140,7 @@ public class MakeSimJoinPlan extends BaseTask {
 		setIfNotSpecified(SimJoinConf.CK_CLUSTER_TASK_SLOTS, "2");
 		setIfNotSpecified(SimJoinConf.CK_HANDLER_ITEMJOIN_CLASS,
 				NestedLoopItemJoinHandler.class.getName());
+		setIfNotSpecified(SimJoinConf.CK_SKIP_DEDUP, "false");
 	}
 	
 	private void setIfNotSpecified(String confKey, String defaultValue) {

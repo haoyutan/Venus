@@ -90,18 +90,15 @@ public class PartitionJoin extends BaseTask {
 	
 	@Override
 	protected int runTask(String[] args) throws Exception {
-		return runJob(args);
+		Configuration conf = getConf();
+		FileSystem fs = taskOutputPath.getFileSystem(conf);
+		fs.delete(taskOutputPath, true);
+		return runJob();
 	}
 	
 	@SuppressWarnings("rawtypes")
-	public int runJob(String[] args) throws Exception {
+	private int runJob() throws Exception {
 		Configuration conf = getConf();
-		
-		// remove output directory
-		FileSystem fs = taskOutputPath.getFileSystem(conf);
-		fs.delete(taskOutputPath, true);
-		
-		// execute job
 		Job job = new Job(conf);
 		String simJoinName = SimJoinConf.getSimJoinName(conf);
 		job.setJobName(simJoinName + "-" + getClass().getSimpleName());

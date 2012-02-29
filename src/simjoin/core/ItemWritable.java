@@ -122,7 +122,18 @@ public abstract class ItemWritable<I extends WritableComparable, P extends Writa
 	}
 	
 	@Override
-	public int hashCode() {
+	final public int hashCode() {
 		return id.hashCode();
+	}
+
+	@SuppressWarnings({ "unchecked" })
+	@Override
+	final public int compareTo(ItemWritable o) {
+		return getId().compareTo(o.getId());
+	}
+	
+	@Override
+	final public boolean equals(Object o) {
+		return getId().equals(((ItemWritable) o).getId());
 	}
 }
