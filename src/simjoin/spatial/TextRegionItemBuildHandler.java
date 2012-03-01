@@ -16,7 +16,7 @@ public class TextRegionItemBuildHandler extends
 	@SuppressWarnings("rawtypes")
 	@Override
 	public void resetItem(ItemWritable item, LongWritable key,
-			Text value) {
+			Text value, int mask) {
 		
 		RegionItemWritable regionItem = (RegionItemWritable) item;
 		

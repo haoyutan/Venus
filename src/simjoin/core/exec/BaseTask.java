@@ -107,6 +107,7 @@ public abstract class BaseTask extends Configured implements Tool {
 			in.close();
 			
 			Map<String, String> kvMap = conf.getValByRegex("simjoin");
+
 			for (Map.Entry<String, String> entry : kvMap.entrySet())
 				prevPlan.set(entry.getKey(), entry.getValue());
 			setConf(prevPlan);

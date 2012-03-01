@@ -18,11 +18,32 @@ public abstract class ItemJoinHandler<ITEM extends ItemWritable> extends
 	public abstract void joinItem(VirtualPartition vp1, VirtualPartition vp2)
 			throws IOException, InterruptedException;
 	
-	public abstract void joinSignature(VirtualPartition vp1, VirtualPartition vp2)
-			throws IOException, InterruptedException;
+	public void joinSignature(VirtualPartition vp1, VirtualPartition vp2)
+			throws IOException, InterruptedException {
+		throw new RuntimeException(
+				"This method is not implemented. Please override it.");
+	}
 	
-	public abstract void joinPayload(VirtualPartition vp1, VirtualPartition vp2)
-			throws IOException, InterruptedException;
+	public void joinPayload(VirtualPartition vp1, VirtualPartition vp2)
+			throws IOException, InterruptedException {
+		throw new RuntimeException(
+				"This method is not implemented. Please override it.");
+	}
+	
+	public boolean acceptItemPair(ItemWritable item1, ItemWritable item2) {
+		return acceptSignaturePair(item1, item2)
+				&& acceptPayloadPair(item1, item2);
+	}
+	
+	public boolean acceptSignaturePair(ItemWritable item1, ItemWritable item2) {
+		return !item1.getId().equals(item2.getId())
+				&& item1.getSignature().equals(item2.getSignature());
+	}
+	
+	public boolean acceptPayloadPair(ItemWritable item1, ItemWritable item2) {
+		return !item1.getId().equals(item2.getId())
+				&& item1.getPayload().equals(item2.getPayload());
+	}
 	
 	public void setItemOutputMask(int itemOutputMask) {
 		this.itemOutputMask = itemOutputMask;

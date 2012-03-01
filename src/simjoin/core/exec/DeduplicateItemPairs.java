@@ -6,15 +6,15 @@ import java.util.Set;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.io.WritableComparator;
+import org.apache.hadoop.io.SequenceFile.CompressionType;
 import org.apache.hadoop.io.WritableUtils;
+import org.apache.hadoop.io.compress.SnappyCodec;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.Partitioner;
 import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.lib.input.SequenceFileInputFormat;
-import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
-import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
+import org.apache.hadoop.mapreduce.lib.output.SequenceFileOutputFormat;
 
 import simjoin.core.ItemWritable;
 import simjoin.core.SimJoinConf;
@@ -75,18 +75,6 @@ public class DeduplicateItemPairs extends BaseTask {
 			return Math.abs(key.getId().hashCode() * 997) % numPartitions;
 		}
 	}
-	
-	public static class ItemIDComparator extends WritableComparator {
-
-		public ItemIDComparator() {
-			super(ItemWritable.class);
-		}
-
-		@Override
-		public int compare(byte[] b1, int s1, int l1, byte[] b2, int s2, int l2) {
-			return WritableComparator.compareBytes(b1, s1, l1, b2, s2, l2);
-		}
-	}
 
 	public DeduplicateItemPairs(Configuration conf) {
 		super(conf);
@@ -116,15 +104,20 @@ public class DeduplicateItemPairs extends BaseTask {
 		job.setMapOutputKeyClass(itemClass);
 		job.setMapOutputValueClass(itemClass);
 		job.setPartitionerClass(DeduplicateItemPairsPartitioner.class);
-		job.setSortComparatorClass(ItemIDComparator.class);
+		job.setSortComparatorClass(ItemWritable.ItemIDComparator.class);
 
 		job.setReducerClass(DeduplicateItemPairsReducer.class);
-		job.setGroupingComparatorClass(ItemIDComparator.class);
+		job.setGroupingComparatorClass(ItemWritable.ItemIDComparator.class);
 		job.setNumReduceTasks(SimJoinConf.getClusterTaskSlots(conf) * 2);
 		job.setOutputKeyClass(itemClass);
 		job.setOutputValueClass(itemClass);
-		job.setOutputFormatClass(TextOutputFormat.class);
-		FileOutputFormat.setOutputPath(job, taskOutputPath);
+		job.setOutputFormatClass(SequenceFileOutputFormat.class);
+		SequenceFileOutputFormat.setOutputPath(job, taskOutputPath);
+		SequenceFileOutputFormat.setCompressOutput(job, true);
+		SequenceFileOutputFormat.setOutputCompressionType(job,
+				CompressionType.BLOCK);
+		SequenceFileOutputFormat.setOutputCompressorClass(job,
+				SnappyCodec.class);
 
 		return (job.waitForCompletion(true) ? 0 : 1);
 	}

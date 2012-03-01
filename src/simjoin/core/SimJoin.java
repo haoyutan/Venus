@@ -14,6 +14,7 @@ import simjoin.core.exec.DeduplicateItemPairs;
 import simjoin.core.exec.MakeSimJoinPlan;
 import simjoin.core.exec.PartitionItems;
 import simjoin.core.exec.PartitionJoin;
+import simjoin.core.exec.RefinementJoin;
 import simjoin.core.exec.SchedulePartitionPairs;
 
 public class SimJoin extends Configured implements Tool {
@@ -102,6 +103,9 @@ public class SimJoin extends Configured implements Tool {
 			conf = new Configuration(plan);
 			chain.appendTask(new DeduplicateItemPairs(conf));
 		}
+		
+		conf = new Configuration(plan);
+		chain.appendTask(new RefinementJoin(conf));
 		
 		return chain.run();
 	}

@@ -26,5 +26,9 @@ public abstract class ItemBuildHandler<KEYIN, VALUEIN, ITEM extends ItemWritable
 		return item;
 	}
 	
-	public abstract void resetItem(ItemWritable item, KEYIN key, VALUEIN value);
+	public void resetItem(ItemWritable item, KEYIN key, VALUEIN value) {
+		resetItem(item, key, value, ItemWritable.MASK_ALL);
+	}
+	
+	public abstract void resetItem(ItemWritable item, KEYIN key, VALUEIN value, int mask);
 }

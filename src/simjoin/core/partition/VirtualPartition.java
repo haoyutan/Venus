@@ -4,7 +4,6 @@ import java.io.IOException;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
-import org.apache.hadoop.io.WritableUtils;
 
 import simjoin.core.ItemWritable;
 
@@ -45,9 +44,13 @@ public class VirtualPartition extends Configured {
 	public ItemWritable getCurrentItem() {
 		return getCurrentItem(false);
 	}
+
+	public ItemWritable getCopyOfCurrentItem() {
+		return getCurrentItem(true);
+	}
 	
-	public ItemWritable getCurrentItem(boolean copy) {
-		return (copy ? WritableUtils.clone(reader.getCurrentItem(), getConf())
+	private ItemWritable getCurrentItem(boolean copy) {
+		return (copy ? ItemWritable.clone(getConf(), reader.getCurrentItem())
 				: reader.getCurrentItem());
 	}
 
